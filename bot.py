@@ -1,4 +1,5 @@
 import os
+import asyncio
 from aiogram import Bot, Dispatcher, types
 # ✅ Все нужные модули в одной строке
 from aiogram.filters import Command
