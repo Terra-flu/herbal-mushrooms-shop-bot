@@ -208,7 +208,7 @@ async def show_services_by_category(callback: types.CallbackQuery):
         kb.append([InlineKeyboardButton(text=s["name"], callback_data=f"service_{category}_{i}")])
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="services_menu")])
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption=f"Услуги в категории: {next(cat['name'] for cat in services_categories if cat['callback'] == category}"),
+        media=InputMediaPhoto(media=photo_url, caption=f"Услуги в категории: {next(cat['name'] for cat in services_categories if cat['callback'] == category)}"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
