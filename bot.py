@@ -1,5 +1,6 @@
 import os
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, types
+# ✅ Все нужные модули в одной строке
 from aiogram.filters import Command
 from aiogram.types import Message
 from fastapi import FastAPI
