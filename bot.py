@@ -190,7 +190,7 @@ async def show_products_by_category(callback: types.CallbackQuery):
         kb.append([InlineKeyboardButton(text=p["name"], callback_data=f"product_{category}_{i}")])
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="products_menu")])
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption=f"Товары в категории: {next(cat['name'] for cat in products_categories if cat['callback'] == category}"),
+        media=InputMediaPhoto(media=photo_url, caption=f"Товары в категории: {next(cat['name'] for cat in products_categories if cat['callback'] == category)}"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
