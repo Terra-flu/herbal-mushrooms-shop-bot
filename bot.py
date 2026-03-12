@@ -1,13 +1,17 @@
 import os
 import asyncio
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import Message
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 
-# Получаем токен и ID админа из переменных окружения
+# Получаем токен и ID админа
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
+# Создаём бота и диспетчер
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
@@ -39,7 +43,7 @@ services = [
 
 # Главное меню
 @dp.message(Command("start"))
-async def start(message: types.Message):
+async def start(message: Message):
     kb = [
         [InlineKeyboardButton(text="🌿 Товары", callback_data="products")],
         [InlineKeyboardButton(text="💬 Услуги", callback_data="services")],
@@ -128,9 +132,30 @@ async def about(callback: types.CallbackQuery):
 async def back_to_main(callback: types.CallbackQuery):
     await start(callback.message)
 
-# Запуск
-async def main():
+# Создаём FastAPI
+app = FastAPI()
+
+# Настройка CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Запуск бота
+async def start_bot():
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# Запуск FastAPI
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(start_bot())
+
+# Проверка — что Render видит порт
+@app.get("/")
+async def root():
+    return {"status": "bot is running"}
+
+# Запуск
