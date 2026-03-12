@@ -1,5 +1,4 @@
 import os
-import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -159,3 +158,5 @@ async def root():
     return {"status": "bot is running"}
 
 # Запуск
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
