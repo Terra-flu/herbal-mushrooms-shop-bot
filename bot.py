@@ -56,7 +56,7 @@ async def start(message: Message):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 # Категории товаров
-@@dp.callback_query(lambda c: c.data == "products")
+@dp.callback_query(lambda c: c.data == "products")
 async def show_products(callback: types.CallbackQuery):
     photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"  # ✅ Твоя картинка
     kb = []
@@ -68,7 +68,7 @@ async def show_products(callback: types.CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 # Категории услуг
-@@dp.callback_query(lambda c: c.data == "services")
+@dp.callback_query(lambda c: c.data == "services")
 async def show_services(callback: types.CallbackQuery):
     photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"  # ✅ Твоя картинка
     kb = []
