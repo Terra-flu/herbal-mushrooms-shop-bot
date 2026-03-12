@@ -2,7 +2,11 @@ import os
 import asyncio  # ✅ Добавлено
 from aiogram import Bot, Dispatcher, types  # ✅ Добавлено types
 from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup  # ✅ Добавлено InlineKeyboardButton и InlineKeyboardMarkup
+from aiogram.types import Message, Inimport os
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup  # ✅ Добавлено
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
