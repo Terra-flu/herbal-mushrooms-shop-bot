@@ -44,13 +44,17 @@ services = [
 # Главное меню
 @dp.message(Command("start"))
 async def start(message: Message):
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"  # ✅ Твоя картинка
     kb = [
         [InlineKeyboardButton(text="🌿 Товары", callback_data="products")],
         [InlineKeyboardButton(text="💬 Услуги", callback_data="services")],
         [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")]
     ]
-    await message.answer("Добро пожаловать в нашу витрину!", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-
+    await message.answer_photo(
+        photo=photo_url,
+        caption="Добро пожаловать, Ищущий, в нашу витрину!",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
 # Категории товаров
 @dp.callback_query(lambda c: c.data == "products")
 async def show_products(callback: types.CallbackQuery):
