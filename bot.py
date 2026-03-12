@@ -58,12 +58,15 @@ async def start(message: Message):
 # Категории товаров
 @dp.callback_query(lambda c: c.data == "products")
 async def show_products(callback: types.CallbackQuery):
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"  # ✅ Твоя картинка
     kb = []
     for i, p in enumerate(products):
         kb.append([InlineKeyboardButton(text=p["name"], callback_data=f"product_{i}")])
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="main")])
-    await callback.message.edit_text("Выбери растение:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=photo_url, caption="Выбери растение:"),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
 # Категории услуг
 @dp.callback_query(lambda c: c.data == "services")
 async def show_services(callback: types.CallbackQuery):
