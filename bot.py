@@ -1,9 +1,8 @@
 import os
-import asyncio
-from aiogram import Bot, Dispatcher, types
-# ✅ Все нужные модули в одной строке
+import asyncio  # ✅ Добавлено
+from aiogram import Bot, Dispatcher, types  # ✅ Добавлено types
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup  # ✅ Добавлено InlineKeyboardButton и InlineKeyboardMarkup
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
