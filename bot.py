@@ -277,7 +277,6 @@ async def back_to_main(callback: types.CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
-# Создаём FastAPI с lifespan
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -289,6 +288,7 @@ async def lifespan(app: FastAPI):
     await bot.delete_webhook()
     logging.info("Webhook deleted")
 
+# Создаём FastAPI с lifespan
 app = FastAPI(lifespan=lifespan)
 
 # Настройка CORS
@@ -298,9 +298,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-) 
+)
 
-# Простой тестовый эндпоинт — чтобы проверить, что сервер жив
+# Обработчик вебхука — ВНЕ lifespan!
+@app.post("/webhook")
+async def webhook(update: dict):
+    logging.info(f"Received update: {update}")
+    await dp.feed_update(bot, Update(**update))
+    return {"ok": True}
+
+# Простой тестовый эндпоинт
 @app.get("/")
 async def root():
     return {"status": "bot is running"}
