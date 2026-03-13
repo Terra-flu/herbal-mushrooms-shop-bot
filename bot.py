@@ -107,7 +107,7 @@ services = {
             "name": "Грибной ретрит",
             "price": "50000 руб/3 дня",
             "desc": "3 дня с полным погружением с Проводником в Трип на Пантерном Мухоморе:Випасана или Атмавичара, работа с Психосоматикой в трипе, разблокировка тела и ума медитация, чай из грибов.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/retrit.jpg?text=Ретрит"
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/retrit.jpg"
         }
     ],
     "sitter": [
