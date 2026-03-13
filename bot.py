@@ -324,7 +324,15 @@ async def back_to_main(callback: types.CallbackQuery):
         media=InputMediaPhoto(media=photo_url, caption="Добро пожаловать, Ищущий, в нашу витрину!"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
-
+# Отправка списка заказа в телеграм по запросу
+@dp.message(Command("orders"))
+async def send_orders(message: Message):
+    if os.path.exists("orders.json"):
+        with open("orders.json", "rb") as f:
+            await message.answer_document(f)
+    else:
+        await message.answer("Нет заказов.")
+        
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
