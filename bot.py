@@ -205,18 +205,25 @@ async def show_product(callback: types.CallbackQuery):
         category = parts [1]
         idx = int(parts [2])
         p = products[category][idx]
+
         kb = [
             [InlineKeyboardButton(text="✅ Заказать", callback_data=f"order_product_{category}_{idx}")],
             [InlineKeyboardButton(text="« Назад", callback_data=f"products_{category}")]
         ]
-        await callback.message.edit_media(
-            media=InputMediaPhoto(media=p["photo"], caption=f"<b>{p['name']}</b>\n\n{p['desc']}\n\nЦена: {p['price']}", parse_mode="HTML"),
+
+        # Удаляем старое сообщение и отправляем новое
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=p["photo"],
+            caption=f"<b>{p['name']}</b>\n\n{p['desc']}\n\nЦена: {p['price']}",
+            parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
         )
+        await callback.answer()  # Чтобы убрать "загрузка"
     except Exception as e:
         logging.error(f"Error in show_product: {e}")
         await callback.answer("Ошибка при загрузке товара", show_alert=True)
-
+        
 # Показ конкретной услуги
 @dp.callback_query(lambda c: c.data.startswith("service_"))
 async def show_service(callback: types.CallbackQuery):
@@ -225,18 +232,25 @@ async def show_service(callback: types.CallbackQuery):
         category = parts [1]
         idx = int(parts [2])
         s = services[category][idx]
+
         kb = [
             [InlineKeyboardButton(text="✅ Заказать", callback_data=f"order_service_{category}_{idx}")],
             [InlineKeyboardButton(text="« Назад", callback_data=f"services_{category}")]
         ]
-        await callback.message.edit_media(
-            media=InputMediaPhoto(media=s["photo"], caption=f"<b>{s['name']}</b>\n\n{s['desc']}\n\nЦена: {s['price']}", parse_mode="HTML"),
+
+        # Удаляем старое сообщение и отправляем новое
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=s["photo"],
+            caption=f"<b>{s['name']}</b>\n\n{s['desc']}\n\nЦена: {s['price']}",
+            parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
-          )  
+        )
+        await callback.answer()  # Чтобы убрать "загрузка"
     except Exception as e:
         logging.error(f"Error in show_service: {e}")
         await callback.answer("Ошибка при загрузке услуги", show_alert=True)
-
+        
 # Заказ товара
 @dp.callback_query(lambda c: c.data.startswith("order_product_"))
 async def order_product(callback: types.CallbackQuery):
