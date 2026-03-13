@@ -72,7 +72,7 @@ products = {
             "name": "Цветочная пыльца",
             "price": "500 руб/150грамм",
             "desc": "Поддержка иммунитета, стимулятор обмена веществ.Must have!",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg?text="Пыльца"
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg?text='Пыльца'"
         }
     ]
 }
