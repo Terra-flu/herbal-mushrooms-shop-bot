@@ -18,26 +18,26 @@ dp = Dispatcher()
 # Пример товаров
 products = [
     {
-        "name": "Ромашка аптечная",
-        "price": "150 руб/100г",
-        "desc": "Сушёная ромашка для чая и настоев. Успокаивает, помогает при бессоннице.",
-        "photo": "https://via.placeholder.com/300x200?text=Ромашка"
+        "name": "Аконит Джунгарский",
+        "price": "500 руб/50мл",
+        "desc": "Настойка10% .. Свежий корень под индивидуальный заказ.Онкология, Иммуностимулятор и Корректор, все болевые синдромы.",
+        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/akonit.jpg?text=Аконит"
     },
     {
-        "name": "Мелисса лимонная",
-        "price": "200 руб/100г",
-        "desc": "Ароматная трава для чая. Снимает стресс, улучшает настроение.",
-        "photo": "https://via.placeholder.com/300x200?text=Мелисса"
+        "name": "Якорцы стелющиеся. Трибулус",
+        "price": "200 руб/30г",
+        "desc": "Трава для чая. Для мужчин! Повышение уровня гормонов, выносливость, повышение либидо.",
+        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/jakorci.jpg?text=Якорцы стелющиеся"
     }
 ]
 
 # Пример услуг
 services = [
     {
-        "name": "Консультация по травам",
+        "name": "Консультация по методикам индивидуального оздоровления, внутренней трансформации и лекарственным  травам,",
         "price": "500 руб/30 мин",
-        "desc": "Подбор растений под твои цели: сон, иммунитет, стресс. Онлайн или очно.",
-        "photo": "https://via.placeholder.com/300x200?text=Консультация"
+        "desc": "Подбор под твои цели: трансформация, тревожность, плохая'карма' сон, иммунитет, стресс. Онлайн или очно.",
+        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/konsult.jpg?text=Консультация"
     }
 ]
     
@@ -61,32 +61,36 @@ services_categories = [
 products = {
     "plants": [
         {
-            "name": "Ромашка аптечная",
-            "price": "150 руб/100г",
-            "desc": "Сушёная ромашка для чая и настоев. Успокаивает, помогает при бессоннице.",
-            "photo": "https://via.placeholder.com/300x200?text=Ромашка"
+            
+        "name": "Аконит Джунгарский",
+        "price": "500 руб/50мл",
+        "desc": "Настойка10% .. Свежий корень под индивидуальный заказ.Онкология, Иммуностимулятор и Корректор, все болевые синдромы.",
+        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/akonit.jpg?text=Аконит"
+    },
+    {
         },
         {
-            "name": "Мелисса лимонная",
-            "price": "200 руб/100г",
-            "desc": "Ароматная трава для чая. Снимает стресс, улучшает настроение.",
-            "photo": "https://via.placeholder.com/300x200?text=Мелисса"
-        }
+            
+        "name": "Якорцы стелющиеся. Трибулус",
+        "price": "200 руб/30г",
+        "desc": "Трава для чая. Для мужчин! Повышение уровня гормонов, выносливость, повышение либидо.",
+        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/jakorci.jpg?text=Якорцы стелющиеся"
+ }
     ],
     "mushrooms": [
         {
-            "name": "Лисички",
-            "price": "300 руб/100г",
-            "desc": "Сушёные лисички. Полезны для иммунитета.",
-            "photo": "https://via.placeholder.com/300x200?text=Лисички"
+            "name": "Мухомор Пантерный",
+            "price": "3500 руб/50г",
+            "desc": "Собраны собственноручно со всеми надлежащими ритуалама в Казахстанском Алтае. Оъем ограничен! Только для глубоких заныров или целей внутренней трансформации.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pantera.jpg?text=Пантерный мухомор"
         }
     ],
     "artifacts": [
         {
             "name": "Камень Силы",
-            "price": "1500 руб",
-            "desc": "Камень, заряженный энергией природы. Помогает в медитации.",
-            "photo": "https://via.placeholder.com/300x200?text=Камень"
+            "price": "3500 руб",
+            "desc": "Камень, заряженный энергией природы. Помогает при болезни, медитации, как Талисман.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/stoun.jpg?text=Камень"
         }
     ],
     "bads": [
@@ -103,34 +107,34 @@ products = {
 services = {
     "consultation": [
         {
-            "name": "Консультация по травам",
+            "name": "Консультация по травам, грибам",
             "price": "500 руб/30 мин",
             "desc": "Подбор растений под твои цели: сон, иммунитет, стресс. Онлайн или очно.",
-            "photo": "https://via.placeholder.com/300x200?text=Консультация"
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/konsult.jpg?text=Консультация"
         }
     ],
     "accompaniment": [
         {
             "name": "Сопровождение в лесу",
-            "price": "2000 руб/2 часа",
-            "desc": "Проведу тебя в лес, покажу грибы и растения, расскажу их свойства.",
-            "photo": "https://via.placeholder.com/300x200?text=Сопровождение"
+            "price": "5000 руб/2 часа",
+            "desc": "Проведу тебя в лес, покажу грибы и лекарственные травы и растения, расскажу их свойства научу собирать.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/compani.jpg?text=Сопровождение"
         }
     ],
     "retreats": [
         {
             "name": "Грибной ретрит",
-            "price": "5000 руб/день",
-            "desc": "Полный день в лесу: сбор, медитация, чай из грибов.",
-            "photo": "https://via.placeholder.com/300x200?text=Ретрит"
+            "price": "50000 руб/3 дня",
+            "desc": "3 дня с полным погружением с Проводником в Трип на Пантерном Мухоморе:Випасана или Атмавичара, работа с Психосоматикой в трипе, разблокировка тела и ума медитация, чай из грибов.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/retrit.jpg?text=Ретрит"
         }
     ],
     "sitter": [
         {
             "name": "Услуги Ситтера",
-            "price": "1000 руб/час",
-            "desc": "Помогу сидеть с тобой, если ты в 'Тупняке' — поддержу, утешу, проведу ритуал.",
-            "photo": "https://via.placeholder.com/300x200?text=Ситтер"
+            "price": "8000 руб/8 часов",
+            "desc": "Буду сидеть с тобой, если ты в 'Тупняке' — поддержу, привяжу, утешу, свожу в туалет, не дам убиться  тебе.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/sitter.jpg?text=Ситтер"
         }
     ]
 }
@@ -138,7 +142,7 @@ services = {
 # Главное меню
 @dp.message(Command("start"))
 async def start(message: Message):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/main_banner.jpg"
     kb = [
         [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
         [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
@@ -150,10 +154,10 @@ async def start(message: Message):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
-# Меню каатегорий товаров
+# Меню категорий товаров
 @dp.callback_query(lambda c: c.data == "products_menu")
 async def products_menu(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_products.jpg"
     kb = []
     for cat in products_categories:
         kb.append([InlineKeyboardButton(text=cat["name"], callback_data=f"products_{cat['callback']}")])
@@ -166,7 +170,7 @@ async def products_menu(callback: types.CallbackQuery):
 # Меню категорий услуг
 @dp.callback_query(lambda c: c.data == "services_menu")
 async def services_menu(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_services.jpg"
     kb = []
     for cat in services_categories:
         kb.append([InlineKeyboardButton(text=cat["name"], callback_data=f"services_{cat['callback']}")])
@@ -184,7 +188,7 @@ async def show_products_by_category(callback: types.CallbackQuery):
         await callback.answer("Категория не найдена", show_alert=True)
         return
 
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_products.jpg"
     kb = []
     for i, p in enumerate(products[category]):
         kb.append([InlineKeyboardButton(text=p["name"], callback_data=f"product_{category}_{i}")])
@@ -271,16 +275,16 @@ async def order_service(callback: types.CallbackQuery):
 # О нас
 @dp.callback_query(lambda c: c.data == "about")
 async def about(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about_banner.jpg"
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption="🌿 Мы занимаемся сбором и продажей лекарственных растений.\n💬 Проводим консультации по их применению.\n\nСвязаться: @ваш_юзернейм"),
+        media=InputMediaPhoto(media=photo_url, caption="🌿 Мы занимаемся сбором и продажей лекарственных грибов и растений.Консультации и индивидуальное сопровождение. Работа с психосоматикой, кризисами и застарелыми болезнями. \n💬 Проводим консультации по их применению.\n\nСвязаться: @ваш_юзернейм"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="« Назад", callback_data="main")]])
     )
     
 # Назад в меню
 @dp.callback_query(lambda c: c.data == "main")
 async def back_to_main(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/main_banner.jpg"
     kb = [
         [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
         [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
