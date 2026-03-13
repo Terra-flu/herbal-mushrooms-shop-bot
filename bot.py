@@ -2,9 +2,11 @@ import os
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Update
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+logging.basicConfig(level=logging.INFO)
 import uvicorn
 
 # Получаем токен и ID админа
@@ -14,32 +16,6 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 # Создаём бота и диспетчер
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
-# Пример товаров
-products = [
-    {
-        "name": "Аконит Джунгарский",
-        "price": "500 руб/50мл",
-        "desc": "Настойка10% .. Свежий корень под индивидуальный заказ.Онкология, Иммуностимулятор и Корректор, все болевые синдромы.",
-        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/akonit.jpg?text=Аконит"
-    },
-    {
-        "name": "Якорцы стелющиеся. Трибулус",
-        "price": "200 руб/30г",
-        "desc": "Трава для чая. Для мужчин! Повышение уровня гормонов, выносливость, повышение либидо.",
-        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/jakorci.jpg?text=Якорцы стелющиеся"
-    }
-]
-
-# Пример услуг
-services = [
-    {
-        "name": "Консультация по методикам индивидуального оздоровления, внутренней трансформации и лекарственным  травам,",
-        "price": "500 руб/30 мин",
-        "desc": "Подбор под твои цели: трансформация, тревожность, плохая'карма' сон, иммунитет, стресс. Онлайн или очно.",
-        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/konsult.jpg?text=Консультация"
-    }
-]
     
 # Категории товаров
 products_categories = [
@@ -67,8 +43,6 @@ products = {
         "desc": "Настойка10% .. Свежий корень под индивидуальный заказ.Онкология, Иммуностимулятор и Корректор, все болевые синдромы.",
         "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/akonit.jpg?text=Аконит"
     },
-    {
-        },
         {
             
         "name": "Якорцы стелющиеся. Трибулус",
@@ -219,6 +193,22 @@ async def show_services_by_category(callback: types.CallbackQuery):
 # показ конкретного товара 
 @dp.callback_query(lambda c: c.data.startswith("product_"))
 async def show_product(callback: types.CallbackQuery):
+    try:
+        parts = callback.data.split("_")
+        category = parts [1]
+        idx = int(parts [2])
+        p = products[category][idx]
+        kb = [
+            [InlineKeyboardButton(text="✅ Заказать", callback_data=f"order_product_{category}_{idx}")],
+            [InlineKeyboardButton(text="« Назад", callback_data=f"products_{category}")]
+        ]
+        await callback.message.edit_media(
+            media=InputMediaPhoto(media=p["photo"], caption=f"<b>{p['name']}</b>\n\n{p['desc']}\n\nЦена: {p['price']}", parse_mode="HTML"),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        )
+    except Exception as e:
+        logging.error(f"Error in show_product: {e}")
+        await callback.answer("Ошибка при загрузке товара", show_alert=True)
     parts = callback.data.split("_")
     category = parts [1]
     idx = int(parts [2])
@@ -235,6 +225,22 @@ async def show_product(callback: types.CallbackQuery):
 # Показ конкретной услуги
 @dp.callback_query(lambda c: c.data.startswith("service_"))
 async def show_service(callback: types.CallbackQuery):
+    try:
+        parts = callback.data.split("_")
+        category = parts [1]
+        idx = int(parts [2])
+        s = services[category][idx]
+        kb = [
+            [InlineKeyboardButton(text="✅ Заказать", callback_data=f"order_service_{category}_{idx}")],
+            [InlineKeyboardButton(text="« Назад", callback_data=f"services_{category}")]
+        ]
+        await callback.message.edit_media(
+            media=InputMediaPhoto(media=s["photo"], caption=f"<b>{s['name']}</b>\n\n{s['desc']}\n\nЦена: {s['price']}", parse_mode="HTML"),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+          )  
+    except Exception as e:
+        logging.error(f"Error in show_service: {e}")
+        await callback.answer("Ошибка при загрузке услуги", show_alert=True)
     parts = callback.data.split("_")
     category = parts [1]
     idx = int(parts [2])
@@ -295,8 +301,19 @@ async def back_to_main(callback: types.CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
-# Создаём FastAPI
-app = FastAPI()
+# Создаём FastAPI с lifespan
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    webhook_url = "https://herbal-mushrooms-shop-bot.onrender.com/webhook"
+    await bot.set_webhook(url=webhook_url)
+    logging.info("Webhook set")
+    yield
+    await bot.delete_webhook()
+    logging.info("Webhook deleted")
+
+app = FastAPI(lifespan=lifespan)
 
 # Настройка CORS
 app.add_middleware(
@@ -305,18 +322,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
+) 
 
-# Запуск бота
-async def start_bot():
-    await dp.start_polling(bot)
-
-# Запуск FastAPI
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(start_bot())
-
-# Проверка — что Render видит порт
+# Простой тестовый эндпоинт — чтобы проверить, что сервер жив
 @app.get("/")
 async def root():
     return {"status": "bot is running"}
