@@ -180,7 +180,7 @@ async def show_services_by_category(callback: types.CallbackQuery):
         await callback.answer("Категория не найдена", show_alert=True)
         return
 
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/IMG_20260312_161546_733.jpg"
+    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/services.jpg"
     kb = []
     for i, s in enumerate(services[category]):
         kb.append([InlineKeyboardButton(text=s["name"], callback_data=f"service_{category}_{i}")])
