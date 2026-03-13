@@ -7,6 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 logging.basicConfig(level=logging.INFO)
+import json
+from datetime import datetime
+
+def log_order(order_data: dict):
+    """Записывает заказ в файл orders.json"""
+    with open("orders.json", "a", encoding="utf-8") as f:
+        f.write(json.dumps(order_data, ensure_ascii=False) + "\n")
 import uvicorn
 
 # Получаем токен и ID админа
@@ -72,7 +79,7 @@ products = {
             "name": "Цветочная пыльца",
             "price": "500 руб/150грамм",
             "desc": "Поддержка иммунитета, стимулятор обмена веществ.Must have!",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg?text='Пыльца'"
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg"
         }
     ]
 }
@@ -238,10 +245,24 @@ async def order_product(callback: types.CallbackQuery):
     idx = int(parts [3])
     p = products[category][idx]
     user = callback.from_user
+
+    # Логируем заказ
+    order_data = {
+        "user_id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "product": p["name"],
+        "price": p["price"],
+        "timestamp": datetime.now().isoformat()
+    }
+    log_order(order_data)
+
+    # Отправляем админу
     order_msg = f"📦 Новый заказ:\n\nТовар: {p['name']}\nЦена: {p['price']}\n\nПользователь: @{user.username or user.id}\nИмя: {user.first_name} {user.last_name or ''}"
     await bot.send_message(ADMIN_ID, order_msg)
     await callback.message.edit_text("✅ Заказ принят! Я свяжусь с вами в ближайшее время.", reply_markup=None)
-
+    
 # Заказ услуги
 @dp.callback_query(lambda c: c.data.startswith("order_service_"))
 async def order_service(callback: types.CallbackQuery):
@@ -250,10 +271,23 @@ async def order_service(callback: types.CallbackQuery):
     idx = int(parts [3])
     s = services[category][idx]
     user = callback.from_user
+
+    # Логируем заказ
+    order_data = {
+        "user_id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "service": s["name"],
+        "price": s["price"],
+        "timestamp": datetime.now().isoformat()
+    }
+    log_order(order_data)
+
+    # Отправляем админу
     order_msg = f"💬 Новая консультация:\n\nУслуга: {s['name']}\nЦена: {s['price']}\n\nПользователь: @{user.username or user.id}\nИмя: {user.first_name} {user.last_name or ''}"
     await bot.send_message(ADMIN_ID, order_msg)
     await callback.message.edit_text("✅ Заказ принят! Я свяжусь с вами в ближайшее время.", reply_markup=None)
-
 # О нас
 @dp.callback_query(lambda c: c.data == "about")
 async def about(callback: types.CallbackQuery):
