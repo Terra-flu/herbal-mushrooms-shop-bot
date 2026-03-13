@@ -62,8 +62,8 @@ products = {
         {
             "name": "Мухомор Пантерный",
             "price": "3500 руб/50г",
-            "desc": "Собраны собственноручно со всеми надлежащими ритуалама в Казахстанском Алтае. Оъем ограничен! Только для глубоких заныров или целей внутренней трансформации.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pantera.jpg?text=Пантерный мухомор"
+            "desc": "Собраны собственноручно со всеми надлежащими ритуалама в Казахстанском Алтае. Объем ограничен! Только для глубоких заныров или целей внутренней трансформации.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pantera.jpg"
         }
     ],
     "artifacts": [
@@ -78,7 +78,7 @@ products = {
         {
             "name": "Цветочная пыльца",
             "price": "500 руб/150грамм",
-            "desc": "Поддержка иммунитета, стимулятор обмена веществ.Must have!",
+            "desc": "Поддержка иммунитета, стимулятор обмена веществ. Собранная с весенне-летнего разнотравия, включая мак, тюльпаны, сафлор. Must have!",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg"
         }
     ]
