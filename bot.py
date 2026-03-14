@@ -15,6 +15,7 @@ def log_order(order_data: dict):
     with open("orders.json", "a", encoding="utf-8") as f:
         f.write(json.dumps(order_data, ensure_ascii=False) + "\n")
 import uvicorn
+cart = {}
 
 # Получаем токен и ID админа
 TOKEN = os.getenv("BOT_TOKEN")
@@ -213,6 +214,10 @@ async def show_product(callback: types.CallbackQuery):
 
         # Удаляем старое сообщение и отправляем новое
         await callback.message.delete()
+        kb = [
+    [InlineKeyboardButton(text="✅ Добавить в корзину", callback_data=f"add_to_cart_product_{category}_{idx}")],
+    [InlineKeyboardButton(text="« Назад", callback_data=f"products_{category}")]
+        ]
         await callback.message.answer_photo(
             photo=p["photo"],
             caption=f"<b>{p['name']}</b>\n\n{p['desc']}\n\nЦена: {p['price']}",
@@ -223,6 +228,7 @@ async def show_product(callback: types.CallbackQuery):
     except Exception as e:
         logging.error(f"Error in show_product: {e}")
         await callback.answer("Ошибка при загрузке товара", show_alert=True)
+        
         
 # Показ конкретной услуги
 @dp.callback_query(lambda c: c.data.startswith("service_"))
@@ -240,6 +246,10 @@ async def show_service(callback: types.CallbackQuery):
 
         # Удаляем старое сообщение и отправляем новое
         await callback.message.delete()
+        kb = [
+    [InlineKeyboardButton(text="✅ Добавить в корзину", callback_data=f"add_to_cart_service_{category}_{idx}")],
+    [InlineKeyboardButton(text="« Назад", callback_data=f"services_{category}")]
+        ]
         await callback.message.answer_photo(
             photo=s["photo"],
             caption=f"<b>{s['name']}</b>\n\n{s['desc']}\n\nЦена: {s['price']}",
@@ -247,6 +257,7 @@ async def show_service(callback: types.CallbackQuery):
             reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
         )
         await callback.answer()  # Чтобы убрать "загрузка"
+    
     except Exception as e:
         logging.error(f"Error in show_service: {e}")
         await callback.answer("Ошибка при загрузке услуги", show_alert=True)
@@ -324,6 +335,62 @@ async def back_to_main(callback: types.CallbackQuery):
         media=InputMediaPhoto(media=photo_url, caption="Добро пожаловать, Ищущий, в нашу витрину!"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
+# 🛒 Добавление товара в корзину
+@dp.callback_query(lambda c: c.data.startswith("add_to_cart_"))
+async def add_to_cart(callback: types.CallbackQuery):
+    parts = callback.data.split("_")
+    item_type = parts [1]  # "product" или "service"
+    category = parts [2]
+    idx = int(parts [3])
+
+    if item_type == "product":
+        item = products[category][idx]
+    else:
+        item = services[category][idx]
+
+    user_id = callback.from_user.id
+
+    # Инициализируем корзину для пользователя
+    if user_id not in cart:
+        cart[user_id] = []
+
+    # Добавляем товар/услугу в корзину
+    cart[user_id].append({
+        "type": item_type,
+        "category": category,
+        "item": item,
+        "id": callback.data  # Чтобы можно было удалить
+    })
+
+    await callback.answer(f"✅ {item['name']} добавлен в корзину!")
+    await callback.message.delete()
+    await callback.message.answer("Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
+@dp.message(Command("cart"))
+async def show_cart(message: Message):
+    user_id = message.from_user.id
+    if user_id not in cart or len(cart[user_id]) == 0:
+        await message.answer("Корзина пуста.")
+        return
+
+    cart_items = cart[user_id]
+    caption = "🛒 Ваша корзина:\n\n"
+    total = 0
+
+    for i, item in enumerate(cart_items):
+        caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
+        total += int(item['item']['price'].split() [0])  # Просто для примера — можно улучшить
+
+    caption += f"\n💰 Итого: {total} руб"
+
+    kb = [
+        [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
+        [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")]
+    ]
+
+    await message.answer(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+
+
 # Отправка списка заказа в телеграм по запросу
 @dp.message(Command("orders"))
 async def send_orders(message: Message):
