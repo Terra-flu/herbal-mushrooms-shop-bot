@@ -545,9 +545,10 @@ app.add_middleware(
 )
 
 # Простой тестовый эндпоинт
+@app.head("/")
 @app.get("/")
-async def root():
-    return {"status": "bot is running"}
+async def health_check():
+    return {"status": "ok", "message": "Бот работает!"}
 
 # ✅ PING эндпоинт для Keep-Alive (UptimeRobot)
 @app.get("/ping")
