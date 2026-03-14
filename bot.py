@@ -24,7 +24,18 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 # Создаём бота и диспетчер
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-    
+
+# О нас
+about_photos = [
+    "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about_banner.jpg",
+    "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about2.jpg",
+    "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about3.jpg"
+]
+
+about_caption = "🌿 Мы занимаемся сбором и продажей лекарственных грибов и растений. Консультации и индивидуальное сопровождение. Работа с психосоматикой, кризисами и застарелыми болезнями.\n💬 Проводим консультации по их применению.\n\nСвязаться: @petrik_suf"
+# Состояние для отслеживания текущего фото
+photo_state = {}
+
 # Категории товаров
 products_categories = [
     {"name": "Растения", "callback": "plants"},
@@ -304,14 +315,52 @@ async def order_service(callback: types.CallbackQuery):
     order_msg = f"💬 Новая консультация:\n\nУслуга: {s['name']}\nЦена: {s['price']}\n\nПользователь: @{user.username or user.id}\nИмя: {user.first_name} {user.last_name or ''}"
     await bot.send_message(ADMIN_ID, order_msg)
     await callback.message.edit_text("✅ Заказ принят! Я свяжусь с вами в ближайшее время.", reply_markup=None)
+
 # О нас
+def build_about_kb(idx: int) -> InlineKeyboardMarkup:
+    """Строит клавиатуру для раздела 'О нас'"""
+    kb = []
+    
+    # Кнопки навигации — только если фото больше одного
+    if len(about_photos) > 1:
+        kb.append([
+            InlineKeyboardButton(text="◀️", callback_data=f"about_slide_{idx - 1}"),
+            InlineKeyboardButton(text=f"{idx + 1}/{len(about_photos)}", callback_data="noop"),
+            InlineKeyboardButton(text="▶️", callback_data=f"about_slide_{idx + 1}")
+        ])
+    
+    kb.append([InlineKeyboardButton(text="« Назад", callback_data="main")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+# Навигация по фото в разделе "О нас"
+@dp.callback_query(lambda c: c.data.startswith("about_slide_"))
+async def about_slide(callback: types.CallbackQuery):
+    idx = int(callback.data.split("_") [2])
+    
+    # Зацикливаем: если вышли за границы — переходим на другой конец
+    idx = idx % len(about_photos)
+    
+    photo_state["about"] = idx
+    kb = build_about_kb(idx)
+
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=about_photos[idx], caption=about_caption),
+        reply_markup=kb
+    )
+    await callback.answer()
 @dp.callback_query(lambda c: c.data == "about")
 async def about(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about_banner.jpg"
+    idx = 0  # Начинаем с первого фото
+    photo_state["about"] = idx  # Сохраняем состояние
+
+    kb = build_about_kb(idx)  # Строим клавиатуру
+
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption="🌿 Мы занимаемся сбором и продажей лекарственных грибов и растений.Консультации и индивидуальное сопровождение. Работа с психосоматикой, кризисами и застарелыми болезнями. \n💬 Проводим консультации по их применению.\n\nСвязаться: @petr_suf"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="« Назад", callback_data="main")]])
+        media=InputMediaPhoto(media=about_photos[idx], caption=about_caption),
+        reply_markup=kb
     )
+    await callback.answer()
     
 # Назад в меню
 @dp.callback_query(lambda c: c.data == "main")
