@@ -309,7 +309,7 @@ async def order_service(callback: types.CallbackQuery):
 async def about(callback: types.CallbackQuery):
     photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about_banner.jpg"
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption="🌿 Мы занимаемся сбором и продажей лекарственных грибов и растений.Консультации и индивидуальное сопровождение. Работа с психосоматикой, кризисами и застарелыми болезнями. \n💬 Проводим консультации по их применению.\n\nСвязаться: @ваш_юзернейм"),
+        media=InputMediaPhoto(media=photo_url, caption="🌿 Мы занимаемся сбором и продажей лекарственных грибов и растений.Консультации и индивидуальное сопровождение. Работа с психосоматикой, кризисами и застарелыми болезнями. \n💬 Проводим консультации по их применению.\n\nСвязаться: @petr_suf"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="« Назад", callback_data="main")]])
     )
     
