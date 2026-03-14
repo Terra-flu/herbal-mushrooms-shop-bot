@@ -514,12 +514,22 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("🚀 ========== БОТ ЗАПУСКАЕТСЯ ==========")
     webhook_url = "https://herbal-mushrooms-shop-bot.onrender.com/webhook"
-    await bot.set_webhook(url=webhook_url)
-    logging.info("Webhook set")
+    try:
+        await bot.set_webhook(url=webhook_url)
+        logger.info(f"✅ Webhook установлен: {webhook_url}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при установке webhook: {e}")
+    
     yield
-    await bot.delete_webhook()
-    logging.info("Webhook deleted")
+    
+    try:
+        await bot.delete_webhook()
+        logger.info("🛑 Webhook удалён (бот останавливается)")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при удалении webhook: {e}")
+    logger.info("🚀 ========== БОТ ОСТАНОВЛЕН ==========")
 
 # Создаём FastAPI с lifespan
 app = FastAPI(lifespan=lifespan)
@@ -533,18 +543,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Обработчик вебхука — ВНЕ lifespan!
-@app.post("/webhook")
-async def webhook(update: dict):
-    logging.info(f"Received update: {update}")
-    await dp.feed_update(bot, Update(**update))
-    return {"ok": True}
-
 # Простой тестовый эндпоинт
 @app.get("/")
 async def root():
     return {"status": "bot is running"}
 
+# ✅ PING эндпоинт для Keep-Alive (UptimeRobot)
+@app.get("/ping")
+async def ping():
+    logger.info("📍 Ping получен от UptimeRobot - бот активен")
+    return {"status": "alive", "timestamp": datetime.now().isoformat()}
+
+# Обработчик вебхука — ВНЕ lifespan!
+@app.post("/webhook")
+async def webhook(update: dict):
+    try:
+        update_id = update.get("update_id", "unknown")
+        if "message" in update:
+            msg_text = update["message"].get("text", "")[:50]
+            user_id = update["message"].get("from", {}).get("id", "unknown")
+            logger.info(f"📨 Update #{update_id} от пользователя {user_id}: {msg_text}")
+        elif "callback_query" in update:
+            callback_data = update["callback_query"].get("data", "")
+            user_id = update["callback_query"].get("from", {}).get("id", "unknown")
+            logger.info(f"🔘 Callback #{update_id} от пользователя {user_id}: {callback_data}")
+        
+        await dp.feed_update(bot, Update(**update))
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"❌ Ошибка в webhook: {e}")
+        return {"ok": False, "error": str(e)}
+
 # Запуск
 if __name__ == "__main__":
+    logger.info("🟢 Запуск Uvicorn сервера на http://0.0.0.0:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
