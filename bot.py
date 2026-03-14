@@ -556,6 +556,10 @@ async def ping():
     logger.info("📍 Ping получен от UptimeRobot - бот активен")
     return {"status": "alive", "timestamp": datetime.now().isoformat()}
 
+@app.head("/ping")
+async def ping_head():
+    return {}
+
 # Обработчик вебхука — ВНЕ lifespan!
 @app.post("/webhook")
 async def webhook(update: dict):
