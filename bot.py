@@ -126,10 +126,11 @@ services = {
 async def start(message: Message):
     photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/main_banner.jpg"
     kb = [
-        [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
-        [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
-        [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")]
-    ]
+    [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
+    [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
+    [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart_inline")],
+    [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")]
+]
     await message.answer_photo(
         photo=photo_url,
         caption="Добро пожаловать,Ищущий, в нашу витрину!",
@@ -207,11 +208,6 @@ async def show_product(callback: types.CallbackQuery):
         idx = int(parts [2])
         p = products[category][idx]
 
-        kb = [
-            [InlineKeyboardButton(text="✅ Заказать", callback_data=f"order_product_{category}_{idx}")],
-            [InlineKeyboardButton(text="« Назад", callback_data=f"products_{category}")]
-        ]
-
         # Удаляем старое сообщение и отправляем новое
         await callback.message.delete()
         kb = [
@@ -238,11 +234,6 @@ async def show_service(callback: types.CallbackQuery):
         category = parts [1]
         idx = int(parts [2])
         s = services[category][idx]
-
-        kb = [
-            [InlineKeyboardButton(text="✅ Заказать", callback_data=f"order_service_{category}_{idx}")],
-            [InlineKeyboardButton(text="« Назад", callback_data=f"services_{category}")]
-        ]
 
         # Удаляем старое сообщение и отправляем новое
         await callback.message.delete()
@@ -327,10 +318,11 @@ async def about(callback: types.CallbackQuery):
 async def back_to_main(callback: types.CallbackQuery):
     photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/main_banner.jpg"
     kb = [
-        [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
-        [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
-        [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")]
-    ]
+    [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
+    [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
+    [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart_inline")],
+    [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")]
+]
     await callback.message.edit_media(
         media=InputMediaPhoto(media=photo_url, caption="Добро пожаловать, Ищущий, в нашу витрину!"),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
@@ -339,9 +331,9 @@ async def back_to_main(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith("add_to_cart_"))
 async def add_to_cart(callback: types.CallbackQuery):
     parts = callback.data.split("_")
-    item_type = parts [1]  # "product" или "service"
-    category = parts [2]
-    idx = int(parts [3])
+    item_type = parts [3]   # "product" или "service"
+    category = parts [4]    # "plants", "mushrooms" и т.д.
+    idx = int(parts [5])    # индекс товара
 
     if item_type == "product":
         item = products[category][idx]
@@ -364,7 +356,9 @@ async def add_to_cart(callback: types.CallbackQuery):
 
     await callback.answer(f"✅ {item['name']} добавлен в корзину!")
     await callback.message.delete()
-    await callback.message.answer("Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
+    await callback.bot.send_message(callback.from_user.id, "Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
+
+# 🛒 Показ корзины (через команду /cart)
 @dp.message(Command("cart"))
 async def show_cart(message: Message):
     user_id = message.from_user.id
@@ -378,7 +372,10 @@ async def show_cart(message: Message):
 
     for i, item in enumerate(cart_items):
         caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
-        total += int(item['item']['price'].split() [0])  # Просто для примера — можно улучшить
+        try:
+            total += int(item['item']['price'].split() [0])
+        except:
+            pass
 
     caption += f"\n💰 Итого: {total} руб"
 
@@ -389,7 +386,71 @@ async def show_cart(message: Message):
 
     await message.answer(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
+# 🛒 Показ корзины (через кнопку "🛒 Корзина" в меню)
+@dp.callback_query(lambda c: c.data == "show_cart_inline")
+async def show_cart_inline(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    if user_id not in cart or len(cart[user_id]) == 0:
+        await callback.answer("Корзина пуста.", show_alert=True)
+        return
 
+    cart_items = cart[user_id]
+    caption = "🛒 Ваша корзина:\n\n"
+    total = 0
+
+    for i, item in enumerate(cart_items):
+        caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
+        try:
+            total += int(item['item']['price'].split() [0])
+        except:
+            pass
+
+    caption += f"\n💰 Итого: {total} руб"
+
+    kb = [
+        [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
+        [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")],
+        [InlineKeyboardButton(text="« Назад", callback_data="main")]
+    ]
+
+    await callback.message.edit_caption(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await callback.answer()
+
+# ✅ Оформить заказ
+@dp.callback_query(lambda c: c.data == "checkout")
+async def checkout(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    if user_id not in cart or len(cart[user_id]) == 0:
+        await callback.answer("Корзина пуста.", show_alert=True)
+        return
+
+    order_msg = "📦 Новый заказ из корзины:\n\n"
+    for item in cart[user_id]:
+        if item["type"] == "product":
+            order_msg += f"Товар: {item['item']['name']}\nЦена: {item['item']['price']}\n\n"
+        else:
+            order_msg += f"Услуга: {item['item']['name']}\nЦена: {item['item']['price']}\n\n"
+    order_msg += f"Пользователь: @{callback.from_user.username or callback.from_user.id}\nИмя: {callback.from_user.first_name} {callback.from_user.last_name or ''}"
+
+    # Логируем заказ
+    log_order({
+        "user_id": callback.from_user.id,
+        "username": callback.from_user.username,
+        "items": [item['item']['name'] for item in cart[user_id]],
+        "timestamp": datetime.now().isoformat()
+    })
+
+    await bot.send_message(ADMIN_ID, order_msg)
+    await callback.message.edit_text("✅ Заказ принят! Я свяжусь с вами в ближайшее время.")
+    cart[user_id] = []
+
+# 🗑️ Очистить корзину
+@dp.callback_query(lambda c: c.data == "clear_cart")
+async def clear_cart_handler(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    if user_id in cart:
+        cart[user_id] = []
+    await callback.message.edit_text("🗑️ Корзина очищена.")
 
 # Отправка списка заказа в телеграм по запросу
 @dp.message(Command("orders"))
