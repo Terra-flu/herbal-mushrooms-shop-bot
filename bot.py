@@ -142,6 +142,7 @@ products = {
             
         "name": "Аконит Джунгарский",
         "price": "500 руб/50мл",
+        "price_numeric": 500,
         "desc": "Настойка10% .. Свежий корень под индивидуальный заказ.Онкология, Иммуностимулятор и Корректор, все болевые синдромы.",
         "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/akonit.jpg?text=Аконит"
     },
@@ -149,6 +150,7 @@ products = {
             
         "name": "Якорцы стелющиеся. Трибулус",
         "price": "200 руб/30г",
+        "price_numeric": 500,
         "desc": "Трава для чая. Для мужчин! Повышение уровня гормонов, выносливость, повышение либидо.",
         "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/jakorci.jpg?text=Якорцы стелющиеся"
  }
@@ -157,6 +159,7 @@ products = {
         {
             "name": "Мухомор Пантерный",
             "price": "3500 руб/50г",
+            "price_numeric": 500,
             "desc": "Собраны собственноручно со всеми надлежащими ритуалами в Казахстанском Алтае. Объем ограничен! Только для глубоких заныров или целей внутренней трансформации.",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pantera.jpg"
         }
@@ -165,6 +168,7 @@ products = {
         {
             "name": "Камень Силы",
             "price": "3500 руб",
+            "price_numeric": 500,
             "desc": "Камень, заряженный энергией природы. Помогает при болезни, медитации, как Талисман.",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/stoun.jpg?text=Камень"
         }
@@ -173,6 +177,7 @@ products = {
         {
             "name": "Цветочная пыльца",
             "price": "500 руб/150грамм",
+            "price_numeric": 500,
             "desc": "Поддержка иммунитета, стимулятор обмена веществ. Собранная с весенне-летнего разнотравия, включая мак, тюльпаны, сафлор. Must have!",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg"
         }
@@ -185,6 +190,7 @@ services = {
         {
             "name": "Консультация по травам, грибам",
             "price": "500 руб/30 мин",
+            "price_numeric": 500,
             "desc": "Подбор растений под твои цели: сон, иммунитет, стресс. Онлайн или очно.",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/konsult.jpg?text=Консультация"
         }
@@ -193,6 +199,7 @@ services = {
         {
             "name": "Сопровождение в лесу",
             "price": "5000 руб/2 часа",
+            "price_numeric": 500,
             "desc": "Проведу тебя в лес, покажу грибы и лекарственные травы и растения, расскажу их свойства научу собирать.",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/compani.jpg?text=Сопровождение"
         }
@@ -201,6 +208,7 @@ services = {
         {
             "name": "Грибной ретрит",
             "price": "50000 руб/3 дня",
+            "price_numeric": 500,
             "desc": "3 дня с полным погружением с Проводником в Трип на Пантерном Мухоморе:Випасана или Атмавичара, работа с Психосоматикой в трипе, разблокировка тела и ума медитация, чай из грибов.",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/retrit.jpg"
         }
@@ -209,6 +217,7 @@ services = {
         {
             "name": "Услуги Ситтера",
             "price": "8000 руб/8 часов",
+            "price_numeric": 500,
             "desc": "Буду сидеть с тобой, если ты в 'Тупняке' — поддержу, привяжу, утешу, свожу в туалет, не дам убиться  тебе.",
             "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/sitter.jpg?text=Ситтер"
         }
@@ -501,14 +510,9 @@ async def show_cart(message: Message):
     cart_items = cart[user_id]
     caption = "🛒 Ваша корзина:\n\n"
     total = 0
-
-    for i, item in enumerate(cart_items):
-        caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
-        try:
-            total += int(item['item']['price'].split() [0])
-        except:
-            pass
-
+for i, item in enumerate(cart_items):
+    caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
+    total += item['item'].get('price_numeric', 0)   # безопасно, если забыли поле — 0
     caption += f"\n💰 Итого: {total} руб"
 
     kb = [
@@ -529,14 +533,9 @@ async def show_cart_inline(callback: types.CallbackQuery):
     cart_items = cart[user_id]
     caption = "🛒 Ваша корзина:\n\n"
     total = 0
-
     for i, item in enumerate(cart_items):
-        caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
-        try:
-            total += int(item['item']['price'].split() [0])
-        except:
-            pass
-
+    caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
+    total += item['item'].get('price_numeric', 0)   # безопасно, если забыли поле — 0
     caption += f"\n💰 Итого: {total} руб"
 
     kb = [
