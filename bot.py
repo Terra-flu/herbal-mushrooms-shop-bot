@@ -1,3 +1,4 @@
+# 1. Импорты
 import os
 import asyncio
 from aiogram import Bot, Dispatcher, types
@@ -5,27 +6,102 @@ from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Update
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 import json
 from datetime import datetime
-
-def log_order(order_data: dict):
-    """Записывает заказ в файл orders.json"""
-    with open("orders.json", "a", encoding="utf-8") as f:
-        f.write(json.dumps(order_data, ensure_ascii=False) + "\n")
 import uvicorn
-cart = {}
 
-# Получаем токен и ID админа
+# 2. Настройка логгера
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# 3. Получаем токен и ID админа
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-# Создаём бота и диспетчер
+if not TOKEN:
+    logger.error("❌ BOT_TOKEN не установлен!")
+    raise ValueError("BOT_TOKEN не найден")
+
+# ✅ 4. ИНИЦИАЛИЗИРУЕМ БОТ И ДИСПЕТЧЕР ЗДЕСЬ — ПЕРЕД LIFESPAN!
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+# 5. Глобальные переменные
+cart = {}
+
+# 6. Функции
+def log_order(order_data: dict):
+    with open("orders.json", "a", encoding="utf-8") as f:
+        f.write(json.dumps(order_data, ensure_ascii=False) + "\n")
+
+# 7. LIFESPAN — теперь использует уже созданный bot
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🚀 ========== БОТ ЗАПУСКАЕТСЯ ==========")
+    webhook_url = "https://herbal-mushrooms-shop-bot.onrender.com/webhook"
+    try:
+        await bot.set_webhook(url=webhook_url)
+        logger.info(f"✅ Webhook установлен: {webhook_url}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при установке webhook: {e}")
+    
+    yield
+    
+    try:
+        await bot.delete_webhook()
+        logger.info("🛑 Webhook удалён (бот останавливается)")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при удалении webhook: {e}")
+    logger.info("🚀 ========== БОТ ОСТАНОВЛЕН ==========")
+
+# 8. Создаём FastAPI
+app = FastAPI(lifespan=lifespan)
+
+# 9. Настройка CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 10. Эндпоинты
+@app.head("/")
+@app.get("/")
+async def health_check():
+    return {"status": "ok", "message": "Бот работает!"}
+
+@app.get("/ping")
+async def ping():
+    logger.info("📍 Ping получен от UptimeRobot - бот активен")
+    return {"status": "alive", "timestamp": datetime.now().isoformat()}
+
+@app.head("/ping")
+async def ping_head():
+    return {}
+
+# 11. Обработчик webhook
+@app.post("/webhook")
+async def webhook(update: dict):
+    try:
+        update_id = update.get("update_id", "unknown")
+        if "message" in update:
+            msg_text = update["message"].get("text", "")[:50]
+            user_id = update["message"].get("from", {}).get("id", "unknown")
+            logger.info(f"📨 Update #{update_id} от пользователя {user_id}: {msg_text}")
+        elif "callback_query" in update:
+            callback_data = update["callback_query"].get("data", "")
+            user_id = update["callback_query"].get("from", {}).get("id", "unknown")
+            logger.info(f"🔘 Callback #{update_id} от пользователя {user_id}: {callback_data}")
+        
+        await dp.feed_update(bot, Update(**update))
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"❌ Ошибка в webhook: {e}")
+        return {"ok": False, "error": str(e)}
 # О нас
 about_photos = [
     "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about_banner.jpg",
@@ -511,75 +587,6 @@ async def send_orders(message: Message):
     else:
         await message.answer("Нет заказов.")
         
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("🚀 ========== БОТ ЗАПУСКАЕТСЯ ==========")
-    webhook_url = "https://herbal-mushrooms-shop-bot.onrender.com/webhook"
-    try:
-        await bot.set_webhook(url=webhook_url)
-        logger.info(f"✅ Webhook установлен: {webhook_url}")
-    except Exception as e:
-        logger.error(f"❌ Ошибка при установке webhook: {e}")
-    
-    yield
-    
-    try:
-        await bot.delete_webhook()
-        logger.info("🛑 Webhook удалён (бот останавливается)")
-    except Exception as e:
-        logger.error(f"❌ Ошибка при удалении webhook: {e}")
-    logger.info("🚀 ========== БОТ ОСТАНОВЛЕН ==========")
-
-# Создаём FastAPI с lifespan
-app = FastAPI(lifespan=lifespan)
-
-# Настройка CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Простой тестовый эндпоинт
-@app.head("/")
-@app.get("/")
-async def health_check():
-    return {"status": "ok", "message": "Бот работает!"}
-
-# ✅ PING эндпоинт для Keep-Alive (UptimeRobot)
-@app.get("/ping")
-async def ping():
-    logger.info("📍 Ping получен от UptimeRobot - бот активен")
-    return {"status": "alive", "timestamp": datetime.now().isoformat()}
-
-@app.head("/ping")
-async def ping_head():
-    return {}
-
-# Обработчик вебхука — ВНЕ lifespan!
-@app.post("/webhook")
-async def webhook(update: dict):
-    try:
-        update_id = update.get("update_id", "unknown")
-        if "message" in update:
-            msg_text = update["message"].get("text", "")[:50]
-            user_id = update["message"].get("from", {}).get("id", "unknown")
-            logger.info(f"📨 Update #{update_id} от пользователя {user_id}: {msg_text}")
-        elif "callback_query" in update:
-            callback_data = update["callback_query"].get("data", "")
-            user_id = update["callback_query"].get("from", {}).get("id", "unknown")
-            logger.info(f"🔘 Callback #{update_id} от пользователя {user_id}: {callback_data}")
-        
-        await dp.feed_update(bot, Update(**update))
-        return {"ok": True}
-    except Exception as e:
-        logger.error(f"❌ Ошибка в webhook: {e}")
-        return {"ok": False, "error": str(e)}
-
 # Запуск
 if __name__ == "__main__":
     logging.info("🟢 Запуск Uvicorn сервера на http://0.0.0.0:8000")
