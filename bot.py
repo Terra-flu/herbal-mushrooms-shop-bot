@@ -74,6 +74,12 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok", "message": "Бот работает!"}
 
+# Для опроса рендера
+@app.get("/health")
+@app.head("/health")
+async def health_check_render():
+    return {"status": "ok", "message": "Бот работает!"}
+    
 @app.get("/ping")
 async def ping():
     logger.info("📍 Ping получен от UptimeRobot - бот активен")
