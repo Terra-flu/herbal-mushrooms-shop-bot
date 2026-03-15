@@ -472,9 +472,9 @@ async def back_to_main(callback: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith("add_to_cart_"))
 async def add_to_cart(callback: types.CallbackQuery):
     parts = callback.data.split("_")
-    item_type = parts [3]   # "product" или "service"
-    category = parts [4]    # "plants", "mushrooms" и т.д.
-    idx = int(parts [5])    # индекс товара
+    item_type = parts[3]   # "product" или "service"
+    category = parts[4]
+    idx = int(parts[5])
 
     if item_type == "product":
         item = products[category][idx]
@@ -483,17 +483,39 @@ async def add_to_cart(callback: types.CallbackQuery):
 
     user_id = callback.from_user.id
 
+    if user_id not in cart:
+        cart[user_id] = []
+
+    # Проверяем, есть ли уже такой товар в корзине
+    existing = next((it for it in cart[user_id] if it["type"] == item_type and it["category"] == category and it["idx"] == idx), None)
+    if existing:
+        existing["quantity"] += 1  # увеличиваем количество
+        text = f"✅ +1 к {item['name']} (теперь {existing['quantity']})"
+    else:
+        cart[user_id].append({
+            "type": item_type,
+            "category": category,
+            "idx": idx,
+            "quantity": 1
+        })
+        text = f"✅ {item['name']} добавлен в корзину!"
+
+    await callback.answer(text)
+    await callback.message.delete()
+    await callback.bot.send_message(callback.from_user.id, "Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
+
     # Инициализируем корзину для пользователя
     if user_id not in cart:
         cart[user_id] = []
 
     # Добавляем товар/услугу в корзину
-    cart[user_id].append({
-        "type": item_type,
-        "category": category,
-        "item": item,
-        "id": callback.data  # Чтобы можно было удалить
-    })
+    # станет:
+cart[user_id].append({
+    "type": item_type,
+    "category": category,
+    "idx": idx,               # лучше хранить индекс, а не весь item (экономим память)
+    "quantity": 1             # ← новое поле!  # Чтобы можно было удалить
+   })
 
     await callback.answer(f"✅ {item['name']} добавлен в корзину!")
     await callback.message.delete()
@@ -508,11 +530,19 @@ async def show_cart(message: Message):
         return
 
     cart_items = cart[user_id]
-    caption = "🛒 Ваша корзина:\n\n"
-    total = 0
-for i, item in enumerate(cart_items):
-    caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
-    total += item['item'].get('price_numeric', 0)   # безопасно, если забыли поле — 0
+    caption = "🛒 Ваша корзина:\n\п"
+total = 0
+
+for i, entry in enumerate(cart_items):
+    if entry["type"] == "product":
+        item = products[entry["category"]][entry["idx"]]
+    else:
+        item = services[entry["category"]][entry["idx"]]
+    
+    line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
+    caption += line + "\n"
+    
+    total += entry["quantity"] * item.get("price_numeric", 0)
     caption += f"\n💰 Итого: {total} руб"
 
     kb = [
@@ -532,12 +562,20 @@ async def show_cart_inline(callback: types.CallbackQuery):
 
     cart_items = cart[user_id]
     caption = "🛒 Ваша корзина:\n\n"
-    total = 0
-    for i, item in enumerate(cart_items):
-    caption += f"{i+1}. {item['item']['name']} — {item['item']['price']}\n"
-    total += item['item'].get('price_numeric', 0)   # безопасно, если забыли поле — 0
-    caption += f"\n💰 Итого: {total} руб"
+total = 0
 
+for i, entry in enumerate(cart_items):
+    if entry["type"] == "product":
+        item = products[entry["category"]][entry["idx"]]
+    else:
+        item = services[entry["category"]][entry["idx"]]
+    
+    line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
+    caption += line + "\n"
+    
+    total += entry["quantity"] * item.get("price_numeric", 0)
+
+    caption += f"\n💰 Итого: {total} руб"
     kb = [
         [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
         [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")],
