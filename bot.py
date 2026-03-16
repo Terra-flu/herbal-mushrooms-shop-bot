@@ -575,10 +575,10 @@ async def show_cart_inline(callback: types.CallbackQuery):
         else:
             item = services[entry["category"]][entry["idx"]]
     
-       line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
-       caption += line + "\n"
+        line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
+        caption += line + "\n"
     
-       total += entry["quantity"] * item.get("price_numeric", 0)
+        total += entry["quantity"] * item.get("price_numeric", 0)
 
     caption += f"\n💰 Итого: {total} руб"
     kb = [
