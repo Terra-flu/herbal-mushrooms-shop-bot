@@ -516,6 +516,7 @@ async def add_to_cart(callback: types.CallbackQuery):
       "idx": idx,               # лучше хранить индекс, а не весь item (экономим память)
       "quantity": 1             # ← новое поле! 
         })
+    await callback.answer(f"✅ {item['name']} добавлен в корзину!")
     await callback.message.delete()
     await callback.bot.send_message(callback.from_user.id, "Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
 
@@ -544,9 +545,10 @@ for i, entry in enumerate(cart_items):
     caption += f"\n💰 Итого: {total} руб"
 
     kb = [
-        [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
-        [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")]
-    ]
+    [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
+    [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")]
+]
+    
     await message.answer(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 # 🛒 Показ корзины (через кнопку "🛒 Корзина" в меню)
@@ -577,7 +579,7 @@ for i, entry in enumerate(cart_items):
         [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
         [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")],
         [InlineKeyboardButton(text="« Назад", callback_data="main")]
-    ]
+]
 
     await callback.message.edit_caption(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
     await callback.answer()
