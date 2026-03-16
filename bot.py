@@ -514,8 +514,8 @@ cart[user_id].append({
     "type": item_type,
     "category": category,
     "idx": idx,               # лучше хранить индекс, а не весь item (экономим память)
-    "quantity": 1             # ← новое поле!  # Чтобы можно было удалить
-   })
+    "quantity": 1             # ← новое поле! 
+        })
     await callback.message.delete()
     await callback.bot.send_message(callback.from_user.id, "Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
 
