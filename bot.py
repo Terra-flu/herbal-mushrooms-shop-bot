@@ -530,7 +530,7 @@ async def show_cart(message: Message):
 
     cart_items = cart[user_id]
     caption = "🛒 Ваша корзина:\n\п"
-total = 0
+    total = 0
 
 for i, entry in enumerate(cart_items):
     if entry["type"] == "product":
@@ -548,7 +548,6 @@ for i, entry in enumerate(cart_items):
     [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
     [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")]
 ]
-    
     await message.answer(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 # 🛒 Показ корзины (через кнопку "🛒 Корзина" в меню)
@@ -561,7 +560,7 @@ async def show_cart_inline(callback: types.CallbackQuery):
 
     cart_items = cart[user_id]
     caption = "🛒 Ваша корзина:\n\n"
-total = 0
+    total = 0
 
 for i, entry in enumerate(cart_items):
     if entry["type"] == "product":
