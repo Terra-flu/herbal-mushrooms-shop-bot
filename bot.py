@@ -510,11 +510,11 @@ async def add_to_cart(callback: types.CallbackQuery):
 
     # Добавляем товар/услугу в корзину
     # станет:
-cart[user_id].append({
-    "type": item_type,
-    "category": category,
-    "idx": idx,               # лучше хранить индекс, а не весь item (экономим память)
-    "quantity": 1             # ← новое поле! 
+    cart[user_id].append({
+      "type": item_type,
+      "category": category,
+      "idx": idx,               # лучше хранить индекс, а не весь item (экономим память)
+      "quantity": 1             # ← новое поле! 
         })
     await callback.message.delete()
     await callback.bot.send_message(callback.from_user.id, "Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
