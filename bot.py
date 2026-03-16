@@ -522,6 +522,7 @@ async def add_to_cart(callback: types.CallbackQuery):
 
 # 🛒 Показ корзины (через команду /cart)
 @dp.message(Command("cart"))
+@dp.message(Command("cart"))
 async def show_cart(message: Message):
     user_id = message.from_user.id
     if user_id not in cart or len(cart[user_id]) == 0:
@@ -529,28 +530,33 @@ async def show_cart(message: Message):
         return
 
     cart_items = cart[user_id]
-    caption = "🛒 Ваша корзина:\n\п"
+    caption = "🛒 Ваша корзина:\n\n"   # ← здесь было "\n\п" — опечатка, исправил на "\n\n"
     total = 0
 
-for i, entry in enumerate(cart_items):
-    if entry["type"] == "product":
-        item = products[entry["category"]][entry["idx"]]
-    else:
-        item = services[entry["category"]][entry["idx"]]
-    
-    line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
-    caption += line + "\n"
-    
-    total += entry["quantity"] * item.get("price_numeric", 0)
+    # Цикл — внутри него 8 пробелов (2 уровня отступа)
+    for i, entry in enumerate(cart_items):
+        if entry["type"] == "product":
+            item = products[entry["category"]][entry["idx"]]
+        else:
+            item = services[entry["category"]][entry["idx"]]
+        
+        line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
+        caption += line + "\n"
+        
+        total += entry["quantity"] * item.get("price_numeric", 0)
+
+    # ← Здесь цикл закончился — возвращаемся на уровень функции (4 пробела)
     caption += f"\n💰 Итого: {total} руб"
 
     kb = [
         [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
         [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")]
-]
-    
-    await message.answer(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    ]
 
+    await message.answer(
+        caption,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
 # 🛒 Показ корзины (через кнопку "🛒 Корзина" в меню)
 @dp.callback_query(lambda c: c.data == "show_cart_inline")
 async def show_cart_inline(callback: types.CallbackQuery):
