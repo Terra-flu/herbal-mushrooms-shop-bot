@@ -548,7 +548,8 @@ for i, entry in enumerate(cart_items):
     [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
     [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")]
 ]
-    await message.answer(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    
+   await message.answer(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 # 🛒 Показ корзины (через кнопку "🛒 Корзина" в меню)
 @dp.callback_query(lambda c: c.data == "show_cart_inline")
