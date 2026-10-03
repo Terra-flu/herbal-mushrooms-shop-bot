@@ -1,65 +1,79 @@
-# 1. Импорты
+# ============================================================
+# Телеграм-бот "Магазин-витрина" — исправленная и расширенная версия
+# ============================================================
+
 import os
-import asyncio
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, Update
+import json
+import logging
+from datetime import datetime
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import logging
-import json
-from datetime import datetime
 import uvicorn
 
-# 2. Настройка логгера
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import (
+    Message, InlineKeyboardButton, InlineKeyboardMarkup,
+    InputMediaPhoto, Update,
+)
+
+# ---------------- Логирование ----------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 3. Получаем токен и ID админа
+# ---------------- Переменные окружения ----------------
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_ID_RAW = os.getenv("ADMIN_ID")
+ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW else None
+GROUP_ID_RAW = os.getenv("GROUP_ID")             # id группы для заказов, напр. -1001234567890
+GROUP_ID = int(GROUP_ID_RAW) if GROUP_ID_RAW else None
+CHANNEL_ID_RAW = os.getenv("CHANNEL_ID")         # id приватного канала для инвайтов
+CHANNEL_ID = int(CHANNEL_ID_RAW) if CHANNEL_ID_RAW else None
+CHANNEL_STATIC_LINK = os.getenv("CHANNEL_STATIC_LINK")  # запасная статическая ссылка
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "https://herbal-mushrooms-shop-bot.onrender.com")
 
 if not TOKEN:
     logger.error("❌ BOT_TOKEN не установлен!")
     raise ValueError("BOT_TOKEN не найден")
 
-# ✅ 4. ИНИЦИАЛИЗИРУЕМ БОТ И ДИСПЕТЧЕР ЗДЕСЬ — ПЕРЕД LIFESPAN!
 bot = Bot(token=TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
-# 5. Глобальные переменные
-cart = {}
+# ---------------- Хранилище в памяти ----------------
+# ВНИМАНИЕ: при перезапуске бота (в т.ч. из-за "засыпания" на Render) корзины обнуляются.
+# Для продакшена лучше вынести cart в Redis или БД — см. комментарий в конце файла.
+cart: dict[int, list[dict]] = {}   # user_id -> [{"type","category","idx","quantity"}]
 
-# 6. Функции
+
 def log_order(order_data: dict):
     with open("orders.json", "a", encoding="utf-8") as f:
         f.write(json.dumps(order_data, ensure_ascii=False) + "\n")
 
-# 7. LIFESPAN — теперь использует уже созданный bot
+
+# ---------------- FastAPI + webhook ----------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 ========== БОТ ЗАПУСКАЕТСЯ ==========")
-    webhook_url = "https://herbal-mushrooms-shop-bot.onrender.com/webhook"
+    webhook_url = f"{WEBHOOK_HOST}/webhook"
     try:
         await bot.set_webhook(url=webhook_url)
         logger.info(f"✅ Webhook установлен: {webhook_url}")
     except Exception as e:
         logger.error(f"❌ Ошибка при установке webhook: {e}")
-    
     yield
-    
     try:
         await bot.delete_webhook()
         logger.info("🛑 Webhook удалён (бот останавливается)")
     except Exception as e:
         logger.error(f"❌ Ошибка при удалении webhook: {e}")
-    logger.info("🚀 ========== БОТ ОСТАНОВЛЕН ==========")
 
-# 8. Создаём FastAPI
+
 app = FastAPI(lifespan=lifespan)
-
-# 9. Настройка CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -68,123 +82,111 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 10. Эндпоинты
-@app.head("/")
+
 @app.get("/")
+@app.head("/")
 async def health_check():
     return {"status": "ok", "message": "Бот работает!"}
 
-# Для опроса рендера
+
 @app.get("/health")
 @app.head("/health")
 async def health_check_render():
     return {"status": "ok", "message": "Бот работает!"}
-    
+
+
 @app.get("/ping")
 async def ping():
-    logger.info("📍 Ping получен от UptimeRobot - бот активен")
     return {"status": "alive", "timestamp": datetime.now().isoformat()}
+
 
 @app.head("/ping")
 async def ping_head():
     return {}
 
-# 11. Обработчик webhook
+
 @app.post("/webhook")
 async def webhook(update: dict):
     try:
-        update_id = update.get("update_id", "unknown")
-        if "message" in update:
-            msg_text = update["message"].get("text", "")[:50]
-            user_id = update["message"].get("from", {}).get("id", "unknown")
-            logger.info(f"📨 Update #{update_id} от пользователя {user_id}: {msg_text}")
-        elif "callback_query" in update:
-            callback_data = update["callback_query"].get("data", "")
-            user_id = update["callback_query"].get("from", {}).get("id", "unknown")
-            logger.info(f"🔘 Callback #{update_id} от пользователя {user_id}: {callback_data}")
-        
         await dp.feed_update(bot, Update(**update))
         return {"ok": True}
     except Exception as e:
         logger.error(f"❌ Ошибка в webhook: {e}")
         return {"ok": False, "error": str(e)}
-# О нас
+
+
+# ---------------- Каталог ----------------
 about_photos = [
     "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about_banner.jpg",
     "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about2.jpg",
-    "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about3.jpg"
+    "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/about3.jpg",
 ]
+about_caption = (
+    "🌿 Мы занимаемся сбором и продажей лекарственных грибов и растений. "
+    "Консультации и индивидуальное сопровождение. Работа с психосоматикой, "
+    "кризисами и застарелыми болезнями.\n💬 Проводим консультации по их применению.\n\n"
+    "Связаться: @petrik_suf"
+)
 
-about_caption = "🌿 Мы занимаемся сбором и продажей лекарственных грибов и растений. Консультации и индивидуальное сопровождение. Работа с психосоматикой, кризисами и застарелыми болезнями.\n💬 Проводим консультации по их применению.\n\nСвязаться: @petrik_suf"
-# Состояние для отслеживания текущего фото
-photo_state = {}
-
-# Категории товаров
 products_categories = [
     {"name": "Растения", "callback": "plants"},
     {"name": "Грибы", "callback": "mushrooms"},
     {"name": "Артефакты силы", "callback": "artifacts"},
-    {"name": "БАДы", "callback": "bads"}
+    {"name": "БАДы", "callback": "bads"},
 ]
-
-# Категории услуг
 services_categories = [
     {"name": "Консультация", "callback": "consultation"},
     {"name": "Сопровождение", "callback": "accompaniment"},
     {"name": "Грибные Ретриты", "callback": "retreats"},
-    {"name": "Услуги Ситтера или Проводника", "callback": "sitter"}
+    {"name": "Услуги Ситтера или Проводника", "callback": "sitter"},
 ]
 
-# Товары по категориям
 products = {
     "plants": [
         {
-            
-        "name": "Аконит Джунгарский",
-        "price": "500 руб/50мл",
-        "price_numeric": 500,
-        "desc": "Настойка10% .. Свежий корень под индивидуальный заказ.Онкология, Иммуностимулятор и Корректор, все болевые синдромы.",
-        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/akonit.jpg?text=Аконит"
-    },
+            "name": "Аконит Джунгарский",
+            "price": "500 руб/50мл",
+            "price_numeric": 500,
+            "desc": "Настойка 10%. Свежий корень под индивидуальный заказ. Онкология, иммуностимулятор и корректор, все болевые синдромы.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/akonit.jpg",
+        },
         {
-            
-        "name": "Якорцы стелющиеся. Трибулус",
-        "price": "200 руб/30г",
-        "price_numeric": 500,
-        "desc": "Трава для чая. Для мужчин! Повышение уровня гормонов, выносливость, повышение либидо.",
-        "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/jakorci.jpg?text=Якорцы стелющиеся"
- }
+            "name": "Якорцы стелющиеся. Трибулус",
+            "price": "200 руб/30г",
+            "price_numeric": 200,
+            "desc": "Трава для чая. Для мужчин! Повышение уровня гормонов, выносливость, повышение либидо.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/jakorci.jpg",
+        },
     ],
     "mushrooms": [
         {
             "name": "Мухомор Пантерный",
             "price": "3500 руб/50г",
-            "price_numeric": 500,
-            "desc": "Собраны собственноручно со всеми надлежащими ритуалами в Казахстанском Алтае. Объем ограничен! Только для глубоких заныров или целей внутренней трансформации.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pantera.jpg"
+            "price_numeric": 3500,
+            "desc": "Собраны собственноручно со всеми надлежащими ритуалами в Казахстанском Алтае. Объём ограничен! Только для глубоких заныров или целей внутренней трансформации.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pantera.jpg",
         }
     ],
     "artifacts": [
         {
             "name": "Камень Силы",
             "price": "3500 руб",
-            "price_numeric": 500,
-            "desc": "Камень, заряженный энергией природы. Помогает при болезни, медитации, как Талисман.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/stoun.jpg?text=Камень"
+            "price_numeric": 3500,
+            "desc": "Камень, заряженный энергией природы. Помогает при болезни, медитации, как талисман.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/stoun.jpg",
         }
     ],
     "bads": [
         {
             "name": "Цветочная пыльца",
-            "price": "500 руб/150грамм",
+            "price": "500 руб/150г",
             "price_numeric": 500,
-            "desc": "Поддержка иммунитета, стимулятор обмена веществ. Собранная с весенне-летнего разнотравия, включая мак, тюльпаны, сафлор. Must have!",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg"
+            "desc": "Поддержка иммунитета, стимулятор обмена веществ. Собрана с весенне-летнего разнотравья, включая мак, тюльпаны, сафлор. Must have!",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/pilca.jpg",
         }
-    ]
+    ],
 }
 
-# Услуги по категориям
 services = {
     "consultation": [
         {
@@ -192,441 +194,498 @@ services = {
             "price": "500 руб/30 мин",
             "price_numeric": 500,
             "desc": "Подбор растений под твои цели: сон, иммунитет, стресс. Онлайн или очно.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/konsult.jpg?text=Консультация"
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/konsult.jpg",
         }
     ],
     "accompaniment": [
         {
             "name": "Сопровождение в лесу",
             "price": "5000 руб/2 часа",
-            "price_numeric": 500,
-            "desc": "Проведу тебя в лес, покажу грибы и лекарственные травы и растения, расскажу их свойства научу собирать.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/compani.jpg?text=Сопровождение"
+            "price_numeric": 5000,
+            "desc": "Проведу тебя в лес, покажу грибы и лекарственные травы и растения, расскажу их свойства, научу собирать.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/compani.jpg",
         }
     ],
     "retreats": [
         {
             "name": "Грибной ретрит",
             "price": "50000 руб/3 дня",
-            "price_numeric": 500,
-            "desc": "3 дня с полным погружением с Проводником в Трип на Пантерном Мухоморе:Випасана или Атмавичара, работа с Психосоматикой в трипе, разблокировка тела и ума медитация, чай из грибов.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/retrit.jpg"
+            "price_numeric": 50000,
+            "desc": "3 дня с полным погружением с проводником в трип на пантерном мухоморе: випассана или атмавичара, работа с психосоматикой в трипе, разблокировка тела и ума, медитация, чай из грибов.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/retrit.jpg",
         }
     ],
     "sitter": [
         {
-            "name": "Услуги Ситтера",
+            "name": "Услуги ситтера",
             "price": "8000 руб/8 часов",
-            "price_numeric": 500,
-            "desc": "Буду сидеть с тобой, если ты в 'Тупняке' — поддержу, привяжу, утешу, свожу в туалет, не дам убиться  тебе.",
-            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/sitter.jpg?text=Ситтер"
+            "price_numeric": 8000,
+            "desc": "Буду рядом с тобой в процессе — поддержу, утешу, провожу, не дам себе навредить.",
+            "photo": "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/sitter.jpg",
         }
-    ]
+    ],
 }
 
-# Главное меню
+
+def get_item(item_type: str, category: str, idx: int) -> dict:
+    source = products if item_type == "product" else services
+    return source[category][idx]
+
+
+MAIN_BANNER = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/main_banner.jpg"
+
+
+def main_menu_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
+        [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
+        [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart_inline")],
+        [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")],
+    ])
+
+
+# ---------------- FSM оформления заказа ----------------
+class OrderForm(StatesGroup):
+    name = State()
+    phone = State()
+    comment = State()
+    confirm = State()
+
+
+# ================= Главное меню =================
 @dp.message(Command("start"))
 async def start(message: Message):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/main_banner.jpg"
-    kb = [
-    [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
-    [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
-    [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart_inline")],
-    [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")]
-]
     await message.answer_photo(
-        photo=photo_url,
-        caption="Добро пожаловать,Ищущий, в нашу витрину!",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        photo=MAIN_BANNER,
+        caption="Добро пожаловать, Ищущий, в нашу витрину!",
+        reply_markup=main_menu_kb(),
     )
 
-# Меню категорий товаров
-@dp.callback_query(lambda c: c.data == "products_menu")
+
+@dp.callback_query(F.data == "main")
+async def back_to_main(callback: types.CallbackQuery):
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=MAIN_BANNER, caption="Добро пожаловать, Ищущий, в нашу витрину!"),
+        reply_markup=main_menu_kb(),
+    )
+    await callback.answer()
+
+
+# ================= Категории =================
+@dp.callback_query(F.data == "products_menu")
 async def products_menu(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_products.jpg"
-    kb = []
-    for cat in products_categories:
-        kb.append([InlineKeyboardButton(text=cat["name"], callback_data=f"products_{cat['callback']}")])
+    kb = [[InlineKeyboardButton(text=c["name"], callback_data=f"browse_products_{c['callback']}")]
+          for c in products_categories]
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="main")])
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption="Выбери категорию товаров:"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        media=InputMediaPhoto(
+            media="https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_products.jpg",
+            caption="Выбери категорию товаров:",
+        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
     )
-    
-# Меню категорий услуг
-@dp.callback_query(lambda c: c.data == "services_menu")
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "services_menu")
 async def services_menu(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_services.jpg"
-    kb = []
-    for cat in services_categories:
-        kb.append([InlineKeyboardButton(text=cat["name"], callback_data=f"services_{cat['callback']}")])
+    kb = [[InlineKeyboardButton(text=c["name"], callback_data=f"browse_services_{c['callback']}")]
+          for c in services_categories]
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="main")])
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption="Выбери категорию услуг:"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        media=InputMediaPhoto(
+            media="https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_services.jpg",
+            caption="Выбери категорию услуг:",
+        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
     )
-    
-# Меню показа товаров по категории
-@dp.callback_query(lambda c: c.data.startswith("products_"))
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("browse_products_"))
 async def show_products_by_category(callback: types.CallbackQuery):
-    category = callback.data.split("_") [1]
+    category = callback.data.removeprefix("browse_products_")
     if category not in products:
         await callback.answer("Категория не найдена", show_alert=True)
         return
-
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_products.jpg"
-    kb = []
-    for i, p in enumerate(products[category]):
-        kb.append([InlineKeyboardButton(text=p["name"], callback_data=f"product_{category}_{i}")])
+    kb = [[InlineKeyboardButton(text=p["name"], callback_data=f"item_product_{category}_{i}")]
+          for i, p in enumerate(products[category])]
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="products_menu")])
+    cat_name = next(c["name"] for c in products_categories if c["callback"] == category)
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption=f"Товары в категории: {next(cat['name'] for cat in products_categories if cat['callback'] == category)}"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        media=InputMediaPhoto(
+            media="https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_products.jpg",
+            caption=f"Товары в категории: {cat_name}",
+        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
     )
+    await callback.answer()
 
-# Показ услуг по категории
-@dp.callback_query(lambda c: c.data.startswith("services_"))
+
+@dp.callback_query(F.data.startswith("browse_services_"))
 async def show_services_by_category(callback: types.CallbackQuery):
-    category = callback.data.split("_") [1]
+    category = callback.data.removeprefix("browse_services_")
     if category not in services:
         await callback.answer("Категория не найдена", show_alert=True)
         return
-
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/services.jpg"
-    kb = []
-    for i, s in enumerate(services[category]):
-        kb.append([InlineKeyboardButton(text=s["name"], callback_data=f"service_{category}_{i}")])
+    kb = [[InlineKeyboardButton(text=s["name"], callback_data=f"item_service_{category}_{i}")]
+          for i, s in enumerate(services[category])]
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="services_menu")])
+    cat_name = next(c["name"] for c in services_categories if c["callback"] == category)
     await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption=f"Услуги в категории: {next(cat['name'] for cat in services_categories if cat['callback'] == category)}"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        media=InputMediaPhoto(
+            media="https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/banner_services.jpg",
+            caption=f"Услуги в категории: {cat_name}",
+        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
     )
+    await callback.answer()
 
-# показ конкретного товара 
-@dp.callback_query(lambda c: c.data.startswith("product_"))
+
+# ================= Карточка товара/услуги =================
+@dp.callback_query(F.data.startswith("item_product_"))
 async def show_product(callback: types.CallbackQuery):
     try:
-        parts = callback.data.split("_")
-        category = parts [1]
-        idx = int(parts [2])
+        category, idx_str = callback.data.removeprefix("item_product_").rsplit("_", 1)
+        idx = int(idx_str)
         p = products[category][idx]
-
-        # Удаляем старое сообщение и отправляем новое
-        await callback.message.delete()
-        kb = [
-    [InlineKeyboardButton(text="✅ Добавить в корзину", callback_data=f"add_to_cart_product_{category}_{idx}")],
-    [InlineKeyboardButton(text="« Назад", callback_data=f"products_{category}")]
-        ]
-        await callback.message.answer_photo(
-            photo=p["photo"],
-            caption=f"<b>{p['name']}</b>\n\n{p['desc']}\n\nЦена: {p['price']}",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
-        )
-        await callback.answer()  # Чтобы убрать "загрузка"
     except Exception as e:
-        logging.error(f"Error in show_product: {e}")
+        logger.error(f"Error in show_product: {e}")
         await callback.answer("Ошибка при загрузке товара", show_alert=True)
-        
-        
-# Показ конкретной услуги
-@dp.callback_query(lambda c: c.data.startswith("service_"))
+        return
+    kb = [
+        [InlineKeyboardButton(text="➕ Добавить в корзину", callback_data=f"cartadd_product_{category}_{idx}")],
+        [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart_inline")],
+        [InlineKeyboardButton(text="« Назад", callback_data=f"browse_products_{category}")],
+    ]
+    await callback.message.edit_media(
+        media=InputMediaPhoto(
+            media=p["photo"],
+            caption=f"<b>{p['name']}</b>\n\n{p['desc']}\n\nЦена: {p['price']}",
+        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("item_service_"))
 async def show_service(callback: types.CallbackQuery):
     try:
-        parts = callback.data.split("_")
-        category = parts [1]
-        idx = int(parts [2])
+        category, idx_str = callback.data.removeprefix("item_service_").rsplit("_", 1)
+        idx = int(idx_str)
         s = services[category][idx]
-
-        # Удаляем старое сообщение и отправляем новое
-        await callback.message.delete()
-        kb = [
-    [InlineKeyboardButton(text="✅ Добавить в корзину", callback_data=f"add_to_cart_service_{category}_{idx}")],
-    [InlineKeyboardButton(text="« Назад", callback_data=f"services_{category}")]
-        ]
-        await callback.message.answer_photo(
-            photo=s["photo"],
-            caption=f"<b>{s['name']}</b>\n\n{s['desc']}\n\nЦена: {s['price']}",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
-        )
-        await callback.answer()  # Чтобы убрать "загрузка"
-    
     except Exception as e:
-        logging.error(f"Error in show_service: {e}")
+        logger.error(f"Error in show_service: {e}")
         await callback.answer("Ошибка при загрузке услуги", show_alert=True)
-        
-# Заказ товара
-@dp.callback_query(lambda c: c.data.startswith("order_product_"))
-async def order_product(callback: types.CallbackQuery):
-    parts = callback.data.split("_")
-    category = parts [2]
-    idx = int(parts [3])
-    p = products[category][idx]
-    user = callback.from_user
+        return
+    kb = [
+        [InlineKeyboardButton(text="➕ Добавить в корзину", callback_data=f"cartadd_service_{category}_{idx}")],
+        [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart_inline")],
+        [InlineKeyboardButton(text="« Назад", callback_data=f"browse_services_{category}")],
+    ]
+    await callback.message.edit_media(
+        media=InputMediaPhoto(
+            media=s["photo"],
+            caption=f"<b>{s['name']}</b>\n\n{s['desc']}\n\nЦена: {s['price']}",
+        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+    )
+    await callback.answer()
 
-    # Логируем заказ
-    order_data = {
+
+# ================= Корзина =================
+@dp.callback_query(F.data.startswith("cartadd_"))
+async def add_to_cart(callback: types.CallbackQuery):
+    try:
+        _, item_type, category, idx_str = callback.data.split("_")
+        idx = int(idx_str)
+        item = get_item(item_type, category, idx)
+    except Exception as e:
+        logger.error(f"Error in add_to_cart: {e}")
+        await callback.answer("Ошибка добавления в корзину", show_alert=True)
+        return
+
+    user_cart = cart.setdefault(callback.from_user.id, [])
+    existing = next(
+        (it for it in user_cart if it["type"] == item_type and it["category"] == category and it["idx"] == idx),
+        None,
+    )
+    if existing:
+        existing["quantity"] += 1
+        qty = existing["quantity"]
+    else:
+        user_cart.append({"type": item_type, "category": category, "idx": idx, "quantity": 1})
+        qty = 1
+    await callback.answer(f"✅ {item['name']} — в корзине: {qty}")
+
+
+def build_cart_view(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    items = cart.get(user_id, [])
+    if not items:
+        return "🛒 Корзина пуста.", InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="« Назад", callback_data="main")]]
+        )
+
+    lines = ["🛒 <b>Ваша корзина:</b>\n"]
+    kb_rows = []
+    total = 0
+    for i, entry in enumerate(items):
+        item = get_item(entry["type"], entry["category"], entry["idx"])
+        subtotal = entry["quantity"] * item["price_numeric"]
+        total += subtotal
+        lines.append(f"{i + 1}. {item['name']} × {entry['quantity']} — {subtotal} руб")
+        kb_rows.append([
+            InlineKeyboardButton(text="➖", callback_data=f"cartdec_{i}"),
+            InlineKeyboardButton(text=str(entry["quantity"]), callback_data="noop"),
+            InlineKeyboardButton(text="➕", callback_data=f"cartinc_{i}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"cartdel_{i}"),
+        ])
+    lines.append(f"\n💰 <b>Итого: {total} руб</b>")
+
+    kb_rows.append([InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")])
+    kb_rows.append([InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")])
+    kb_rows.append([InlineKeyboardButton(text="« Назад", callback_data="main")])
+    return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=kb_rows)
+
+
+@dp.message(Command("cart"))
+async def show_cart(message: Message):
+    text, kb = build_cart_view(message.from_user.id)
+    await message.answer(text, parse_mode="HTML", reply_markup=kb)
+
+
+@dp.callback_query(F.data == "show_cart_inline")
+async def show_cart_inline(callback: types.CallbackQuery):
+    text, kb = build_cart_view(callback.from_user.id)
+    try:
+        await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
+    await callback.answer()
+
+
+async def _refresh_cart_message(callback: types.CallbackQuery):
+    text, kb = build_cart_view(callback.from_user.id)
+    await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
+
+
+@dp.callback_query(F.data.startswith("cartinc_"))
+async def cart_inc(callback: types.CallbackQuery):
+    i = int(callback.data.removeprefix("cartinc_"))
+    user_cart = cart.get(callback.from_user.id, [])
+    if 0 <= i < len(user_cart):
+        user_cart[i]["quantity"] += 1
+    await _refresh_cart_message(callback)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("cartdec_"))
+async def cart_dec(callback: types.CallbackQuery):
+    i = int(callback.data.removeprefix("cartdec_"))
+    user_cart = cart.get(callback.from_user.id, [])
+    if 0 <= i < len(user_cart):
+        user_cart[i]["quantity"] -= 1
+        if user_cart[i]["quantity"] <= 0:
+            user_cart.pop(i)
+    await _refresh_cart_message(callback)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("cartdel_"))
+async def cart_del(callback: types.CallbackQuery):
+    i = int(callback.data.removeprefix("cartdel_"))
+    user_cart = cart.get(callback.from_user.id, [])
+    if 0 <= i < len(user_cart):
+        user_cart.pop(i)
+    await _refresh_cart_message(callback)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "clear_cart")
+async def clear_cart_handler(callback: types.CallbackQuery):
+    cart[callback.from_user.id] = []
+    await _refresh_cart_message(callback)
+    await callback.answer("Корзина очищена")
+
+
+@dp.callback_query(F.data == "noop")
+async def noop(callback: types.CallbackQuery):
+    await callback.answer()
+
+
+# ================= Оформление заказа (FSM) =================
+@dp.callback_query(F.data == "checkout")
+async def checkout_start(callback: types.CallbackQuery, state: FSMContext):
+    if not cart.get(callback.from_user.id):
+        await callback.answer("Корзина пуста.", show_alert=True)
+        return
+    await state.set_state(OrderForm.name)
+    await callback.message.answer("Оформление заказа.\n\nКак вас зовут? (/cancel — отменить)")
+    await callback.answer()
+
+
+@dp.message(Command("cancel"))
+async def cancel_command(message: Message, state: FSMContext):
+    current = await state.get_state()
+    if current and current.startswith("OrderForm"):
+        await state.clear()
+        await message.answer("Оформление заказа отменено. Товары остались в корзине.")
+    else:
+        await message.answer("Сейчас нечего отменять.")
+
+
+@dp.message(OrderForm.name)
+async def order_get_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text.strip())
+    await state.set_state(OrderForm.phone)
+    await message.answer("Укажите номер телефона для связи:")
+
+
+@dp.message(OrderForm.phone)
+async def order_get_phone(message: Message, state: FSMContext):
+    await state.update_data(phone=message.text.strip())
+    await state.set_state(OrderForm.comment)
+    await message.answer("Комментарий к заказу (адрес, пожелания) — или отправьте «-», если нечего добавить:")
+
+
+@dp.message(OrderForm.comment)
+async def order_get_comment(message: Message, state: FSMContext):
+    await state.update_data(comment=message.text.strip())
+    data = await state.get_data()
+    cart_text, _ = build_cart_view(message.from_user.id)
+
+    summary = (
+        f"{cart_text}\n\n"
+        f"👤 Имя: {data['name']}\n"
+        f"📞 Телефон: {data['phone']}\n"
+        f"📝 Комментарий: {data['comment']}"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Подтвердить заказ", callback_data="confirm_order")],
+        [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_order")],
+    ])
+    await state.set_state(OrderForm.confirm)
+    await message.answer(f"Проверьте данные заказа:\n\n{summary}", parse_mode="HTML", reply_markup=kb)
+
+
+@dp.callback_query(F.data == "cancel_order")
+async def cancel_order(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text("Заказ отменён. Товары остались в корзине.")
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "confirm_order")
+async def confirm_order(callback: types.CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    user = callback.from_user
+    data = await state.get_data()
+    items = cart.get(user_id, [])
+    if not items:
+        await callback.answer("Корзина пуста.", show_alert=True)
+        await state.clear()
+        return
+
+    lines = []
+    total = 0
+    order_items_log = []
+    for entry in items:
+        item = get_item(entry["type"], entry["category"], entry["idx"])
+        subtotal = entry["quantity"] * item["price_numeric"]
+        total += subtotal
+        lines.append(f"• {item['name']} × {entry['quantity']} — {subtotal} руб")
+        order_items_log.append({"name": item["name"], "qty": entry["quantity"]})
+
+    order_text = (
+        "📦 <b>Новый заказ</b>\n\n" + "\n".join(lines) +
+        f"\n\n💰 Итого: {total} руб\n\n"
+        f"👤 Имя: {data.get('name')}\n"
+        f"📞 Телефон: {data.get('phone')}\n"
+        f"📝 Комментарий: {data.get('comment')}\n\n"
+        f"Telegram: @{user.username or '—'} (id {user.id})"
+    )
+
+    log_order({
         "user_id": user.id,
         "username": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "product": p["name"],
-        "price": p["price"],
-        "timestamp": datetime.now().isoformat()
-    }
-    log_order(order_data)
+        "name": data.get("name"),
+        "phone": data.get("phone"),
+        "comment": data.get("comment"),
+        "items": order_items_log,
+        "total": total,
+        "timestamp": datetime.now().isoformat(),
+    })
 
-    # Отправляем админу
-    order_msg = f"📦 Новый заказ:\n\nТовар: {p['name']}\nЦена: {p['price']}\n\nПользователь: @{user.username or user.id}\nИмя: {user.first_name} {user.last_name or ''}"
-    await bot.send_message(ADMIN_ID, order_msg)
-    await callback.message.edit_text("✅ Заказ принят! Я свяжусь с вами в ближайшее время.", reply_markup=None)
-    
-# Заказ услуги
-@dp.callback_query(lambda c: c.data.startswith("order_service_"))
-async def order_service(callback: types.CallbackQuery):
-    parts = callback.data.split("_")
-    category = parts [2]
-    idx = int(parts [3])
-    s = services[category][idx]
-    user = callback.from_user
+    # Отправка в группу (и/или копия админу)
+    target_chat = GROUP_ID or ADMIN_ID
+    if target_chat:
+        try:
+            await bot.send_message(target_chat, order_text, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Не удалось отправить заказ в группу/админу: {e}")
+    if ADMIN_ID and target_chat != ADMIN_ID:
+        try:
+            await bot.send_message(ADMIN_ID, order_text, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Не удалось отправить копию заказа админу: {e}")
 
-    # Логируем заказ
-    order_data = {
-        "user_id": user.id,
-        "username": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "service": s["name"],
-        "price": s["price"],
-        "timestamp": datetime.now().isoformat()
-    }
-    log_order(order_data)
+    # Приглашение в приватный канал
+    invite_text = "✅ Заказ принят! Мы свяжемся с вами в ближайшее время."
+    invite_link = None
+    if CHANNEL_ID:
+        try:
+            link = await bot.create_chat_invite_link(
+                chat_id=CHANNEL_ID,
+                member_limit=1,
+                name=f"order_{user.id}_{int(datetime.now().timestamp())}",
+            )
+            invite_link = link.invite_link
+        except Exception as e:
+            logger.error(f"Не удалось создать инвайт в канал: {e}")
+    if not invite_link and CHANNEL_STATIC_LINK:
+        invite_link = CHANNEL_STATIC_LINK
+    if invite_link:
+        invite_text += f"\n\n💬 Присоединяйтесь к закрытому каналу для вопросов и общения:\n{invite_link}"
 
-    # Отправляем админу
-    order_msg = f"💬 Новая консультация:\n\nУслуга: {s['name']}\nЦена: {s['price']}\n\nПользователь: @{user.username or user.id}\nИмя: {user.first_name} {user.last_name or ''}"
-    await bot.send_message(ADMIN_ID, order_msg)
-    await callback.message.edit_text("✅ Заказ принят! Я свяжусь с вами в ближайшее время.", reply_markup=None)
+    cart[user_id] = []
+    await state.clear()
+    await callback.message.edit_text(invite_text, parse_mode="HTML")
+    await callback.answer()
 
-# О нас
+
+# ================= "О нас" =================
 def build_about_kb(idx: int) -> InlineKeyboardMarkup:
-    """Строит клавиатуру для раздела 'О нас'"""
     kb = []
-    
-    # Кнопки навигации — только если фото больше одного
     if len(about_photos) > 1:
         kb.append([
             InlineKeyboardButton(text="◀️", callback_data=f"about_slide_{idx - 1}"),
             InlineKeyboardButton(text=f"{idx + 1}/{len(about_photos)}", callback_data="noop"),
-            InlineKeyboardButton(text="▶️", callback_data=f"about_slide_{idx + 1}")
+            InlineKeyboardButton(text="▶️", callback_data=f"about_slide_{idx + 1}"),
         ])
-    
     kb.append([InlineKeyboardButton(text="« Назад", callback_data="main")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-# Навигация по фото в разделе "О нас"
-@dp.callback_query(lambda c: c.data.startswith("about_slide_"))
-async def about_slide(callback: types.CallbackQuery):
-    idx = int(callback.data.split("_") [2])
-    
-    # Зацикливаем: если вышли за границы — переходим на другой конец
-    idx = idx % len(about_photos)
-    
-    photo_state["about"] = idx
-    kb = build_about_kb(idx)
-
-    await callback.message.edit_media(
-        media=InputMediaPhoto(media=about_photos[idx], caption=about_caption),
-        reply_markup=kb
-    )
-    await callback.answer()
-@dp.callback_query(lambda c: c.data == "about")
+@dp.callback_query(F.data == "about")
 async def about(callback: types.CallbackQuery):
-    idx = 0  # Начинаем с первого фото
-    photo_state["about"] = idx  # Сохраняем состояние
+    await callback.message.edit_media(
+        media=InputMediaPhoto(media=about_photos[0], caption=about_caption),
+        reply_markup=build_about_kb(0),
+    )
+    await callback.answer()
 
-    kb = build_about_kb(idx)  # Строим клавиатуру
 
+@dp.callback_query(F.data.startswith("about_slide_"))
+async def about_slide(callback: types.CallbackQuery):
+    idx = int(callback.data.removeprefix("about_slide_")) % len(about_photos)
     await callback.message.edit_media(
         media=InputMediaPhoto(media=about_photos[idx], caption=about_caption),
-        reply_markup=kb
+        reply_markup=build_about_kb(idx),
     )
     await callback.answer()
-    
-# Назад в меню
-@dp.callback_query(lambda c: c.data == "main")
-async def back_to_main(callback: types.CallbackQuery):
-    photo_url = "https://raw.githubusercontent.com/Terra-flu/herbal-mushrooms-shop-bot/main/photos/main_banner.jpg"
-    kb = [
-    [InlineKeyboardButton(text="🌿 Товары", callback_data="products_menu")],
-    [InlineKeyboardButton(text="💬 Услуги", callback_data="services_menu")],
-    [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart_inline")],
-    [InlineKeyboardButton(text="ℹ️ О нас", callback_data="about")]
-]
-    await callback.message.edit_media(
-        media=InputMediaPhoto(media=photo_url, caption="Добро пожаловать, Ищущий, в нашу витрину!"),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
-    )
-# 🛒 Добавление товара в корзину
-@dp.callback_query(lambda c: c.data.startswith("add_to_cart_"))
-async def add_to_cart(callback: types.CallbackQuery):
-    parts = callback.data.split("_")
-    item_type = parts[3]   # "product" или "service"
-    category = parts[4]
-    idx = int(parts[5])
 
-    if item_type == "product":
-        item = products[category][idx]
-    else:
-        item = services[category][idx]
 
-    user_id = callback.from_user.id
-
-    if user_id not in cart:
-        cart[user_id] = []
-
-    # Проверяем, есть ли уже такой товар в корзине
-    existing = next((it for it in cart[user_id] if it["type"] == item_type and it["category"] == category and it["idx"] == idx), None)
-    if existing:
-        existing["quantity"] += 1  # увеличиваем количество
-        text = f"✅ +1 к {item['name']} (теперь {existing['quantity']})"
-    else:
-        cart[user_id].append({
-            "type": item_type,
-            "category": category,
-            "idx": idx,
-            "quantity": 1
-        })
-        text = f"✅ {item['name']} добавлен в корзину!"
-
-    await callback.answer(text)
-    await callback.message.delete()
-    await callback.bot.send_message(callback.from_user.id, "Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
-
-    # Инициализируем корзину для пользователя
-    if user_id not in cart:
-        cart[user_id] = []
-
-    # Добавляем товар/услугу в корзину
-    # станет:
-    cart[user_id].append({
-      "type": item_type,
-      "category": category,
-      "idx": idx,               # лучше хранить индекс, а не весь item (экономим память)
-      "quantity": 1             # ← новое поле! 
-        })
-    await callback.answer(f"✅ {item['name']} добавлен в корзину!")
-    await callback.message.delete()
-    await callback.bot.send_message(callback.from_user.id, "Товар/услуга добавлен(а) в корзину. Нажмите /cart, чтобы посмотреть.")
-
-# 🛒 Показ корзины (через команду /cart)
-@dp.message(Command("cart"))
-@dp.message(Command("cart"))
-async def show_cart(message: Message):
-    user_id = message.from_user.id
-    if user_id not in cart or len(cart[user_id]) == 0:
-        await message.answer("Корзина пуста.")
-        return
-
-    cart_items = cart[user_id]
-    caption = "🛒 Ваша корзина:\n\n"   # ← здесь было "\n\п" — опечатка, исправил на "\n\n"
-    total = 0
-
-    # Цикл — внутри него 8 пробелов (2 уровня отступа)
-    for i, entry in enumerate(cart_items):
-        if entry["type"] == "product":
-            item = products[entry["category"]][entry["idx"]]
-        else:
-            item = services[entry["category"]][entry["idx"]]
-        
-        line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
-        caption += line + "\n"
-        
-        total += entry["quantity"] * item.get("price_numeric", 0)
-
-    # ← Здесь цикл закончился — возвращаемся на уровень функции (4 пробела)
-    caption += f"\n💰 Итого: {total} руб"
-
-    kb = [
-        [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
-        [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")]
-    ]
-
-    await message.answer(
-        caption,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
-    )
-# 🛒 Показ корзины (через кнопку "🛒 Корзина" в меню)
-@dp.callback_query(lambda c: c.data == "show_cart_inline")
-async def show_cart_inline(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id not in cart or len(cart[user_id]) == 0:
-        await callback.answer("Корзина пуста.", show_alert=True)
-        return
-
-    cart_items = cart[user_id]
-    caption = "🛒 Ваша корзина:\n\n"
-    total = 0
-
-    for i, entry in enumerate(cart_items):
-        if entry["type"] == "product":
-            item = products[entry["category"]][entry["idx"]]
-        else:
-            item = services[entry["category"]][entry["idx"]]
-    
-        line = f"{i+1}. {item['name']} × {entry['quantity']} — {item['price']}"
-        caption += line + "\n"
-    
-        total += entry["quantity"] * item.get("price_numeric", 0)
-
-    caption += f"\n💰 Итого: {total} руб"
-    kb = [
-        [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
-        [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")],
-        [InlineKeyboardButton(text="« Назад", callback_data="main")]
-   ] 
-
-    await callback.message.edit_caption(caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-    await callback.answer()
-
-# ✅ Оформить заказ
-@dp.callback_query(lambda c: c.data == "checkout")
-async def checkout(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id not in cart or len(cart[user_id]) == 0:
-        await callback.answer("Корзина пуста.", show_alert=True)
-        return
-
-    order_msg = "📦 Новый заказ из корзины:\n\n"
-    for item in cart[user_id]:
-        if item["type"] == "product":
-            order_msg += f"Товар: {item['item']['name']}\nЦена: {item['item']['price']}\n\n"
-        else:
-            order_msg += f"Услуга: {item['item']['name']}\nЦена: {item['item']['price']}\n\n"
-    order_msg += f"Пользователь: @{callback.from_user.username or callback.from_user.id}\nИмя: {callback.from_user.first_name} {callback.from_user.last_name or ''}"
-
-    # Логируем заказ
-    log_order({
-        "user_id": callback.from_user.id,
-        "username": callback.from_user.username,
-        "items": [item['item']['name'] for item in cart[user_id]],
-        "timestamp": datetime.now().isoformat()
-    })
-
-    await bot.send_message(ADMIN_ID, order_msg)
-    await callback.message.edit_text("✅ Заказ принят! Я свяжусь с вами в ближайшее время.")
-    cart[user_id] = []
-
-# 🗑️ Очистить корзину
-@dp.callback_query(lambda c: c.data == "clear_cart")
-async def clear_cart_handler(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id in cart:
-        cart[user_id] = []
-    await callback.message.edit_text("🗑️ Корзина очищена.")
-
-# Отправка списка заказа в телеграм по запросу
+# ================= Служебные команды =================
 @dp.message(Command("orders"))
 async def send_orders(message: Message):
     if os.path.exists("orders.json"):
@@ -634,8 +693,34 @@ async def send_orders(message: Message):
             await message.answer_document(f)
     else:
         await message.answer("Нет заказов.")
-        
-# Запуск
+
+
+# ================= Запуск =================
 if __name__ == "__main__":
     logging.info("🟢 Запуск Uvicorn сервера на http://0.0.0.0:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# ============================================================
+# ЗАМЕТКИ ПО ДОРАБОТКЕ (не код, просто рекомендации):
+#
+# 1. Хостинг: на бесплатном тарифе Render контейнер "засыпает" при простое,
+#    и UptimeRobot не всегда успевает разбудить его до прихода вебхука —
+#    Telegram просто не дожидается ответа. Варианты решения:
+#    - Render Starter (платный, ~7$/мес) — не засыпает.
+#    - Railway / Fly.io — на некоторых тарифах более щадящий "сон".
+#    - Свой недорогой VPS + long polling вместо webhook — не зависит от
+#      "пробуждения по HTTP-запросу" вообще.
+#    - Как временный костыль — держать внешний cron (не UptimeRobot, а,
+#      например, cron-job.org) с интервалом 1 минута, но это не гарантия.
+#
+# 2. Нужные переменные окружения для новых функций:
+#    GROUP_ID            — id группы, куда падают заказы (боту нужны права писать туда)
+#    CHANNEL_ID          — id приватного канала (бот должен быть админом канала
+#                           с правом "Приглашать пользователей")
+#    CHANNEL_STATIC_LINK — запасная постоянная ссылка-приглашение, если
+#                           create_chat_invite_link недоступен
+#
+# 3. Корзины сейчас хранятся в оперативной памяти процесса (словарь cart) —
+#    при перезапуске бота (падение, деплой, "сон" на Render) они обнуляются.
+#    Для реального магазина стоит сохранять корзину в SQLite/Postgres/Redis.
+# ============================================================
