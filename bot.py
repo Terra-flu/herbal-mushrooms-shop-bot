@@ -35,11 +35,19 @@ GROUP_ID = int(GROUP_ID_RAW) if GROUP_ID_RAW else None
 CHANNEL_ID_RAW = os.getenv("CHANNEL_ID")         # id приватного канала для инвайтов
 CHANNEL_ID = int(CHANNEL_ID_RAW) if CHANNEL_ID_RAW else None
 CHANNEL_STATIC_LINK = os.getenv("CHANNEL_STATIC_LINK")  # запасная статическая ссылка
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "https://herbal-mushrooms-shop-bot.onrender.com")
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # напр. https://<имя-сервиса>.northflank.app — без слэша на конце
+PORT = int(os.getenv("PORT", "8000"))     # Northflank сам подставит порт, если он задан в настройках сервиса
 
 if not TOKEN:
     logger.error("❌ BOT_TOKEN не установлен!")
     raise ValueError("BOT_TOKEN не найден")
+
+if not WEBHOOK_HOST:
+    logger.error("❌ WEBHOOK_HOST не установлен! Укажи публичный адрес сервиса на Northflank.")
+    raise ValueError("WEBHOOK_HOST не найден")
+
+if not ADMIN_ID and not GROUP_ID:
+    logger.warning("⚠️ Не заданы ни ADMIN_ID, ни GROUP_ID — заказы некому будет отправлять в Telegram!")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -697,30 +705,40 @@ async def send_orders(message: Message):
 
 # ================= Запуск =================
 if __name__ == "__main__":
-    logging.info("🟢 Запуск Uvicorn сервера на http://0.0.0.0:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    logging.info(f"🟢 Запуск Uvicorn сервера на http://0.0.0.0:{PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
 
 # ============================================================
-# ЗАМЕТКИ ПО ДОРАБОТКЕ (не код, просто рекомендации):
+# ЗАМЕТКИ ПО ДЕПЛОЮ НА NORTHFLANK (не код, просто рекомендации):
 #
-# 1. Хостинг: на бесплатном тарифе Render контейнер "засыпает" при простое,
-#    и UptimeRobot не всегда успевает разбудить его до прихода вебхука —
-#    Telegram просто не дожидается ответа. Варианты решения:
-#    - Render Starter (платный, ~7$/мес) — не засыпает.
-#    - Railway / Fly.io — на некоторых тарифах более щадящий "сон".
-#    - Свой недорогой VPS + long polling вместо webhook — не зависит от
-#      "пробуждения по HTTP-запросу" вообще.
-#    - Как временный костыль — держать внешний cron (не UptimeRobot, а,
-#      например, cron-job.org) с интервалом 1 минута, но это не гарантия.
+# 1. Переменные окружения, которые нужно задать в Northflank (Secret group /
+#    Runtime environment variables сервиса):
+#    BOT_TOKEN            — токен бота от @BotFather
+#    ADMIN_ID             — твой личный numeric Telegram ID (узнать через @userinfobot)
+#    WEBHOOK_HOST          — https://<имя-сервиса>.northflank.app (без / на конце;
+#                            Northflank покажет точный адрес после первого деплоя)
+#    GROUP_ID             — (необязательно) id группы для заказов
+#    CHANNEL_ID           — (необязательно) id приватного канала для инвайтов
+#    CHANNEL_STATIC_LINK  — (необязательно) запасная постоянная ссылка-приглашение
+#    PORT                  — обычно не нужно трогать, по умолчанию 8000; просто
+#                            укажи этот же порт как "Public port" в настройках
+#                            сервиса на Northflank (раздел Networking)
 #
-# 2. Нужные переменные окружения для новых функций:
-#    GROUP_ID            — id группы, куда падают заказы (боту нужны права писать туда)
-#    CHANNEL_ID          — id приватного канала (бот должен быть админом канала
-#                           с правом "Приглашать пользователей")
-#    CHANNEL_STATIC_LINK — запасная постоянная ссылка-приглашение, если
-#                           create_chat_invite_link недоступен
+# 2. Диск контейнера на Northflank (как и почти везде на бесплатных тарифах)
+#    НЕ сохраняется между передеплоями/перезапусками. orders.json — это просто
+#    быстрый локальный лог для команды /orders, а не надёжное хранилище:
+#    не полагайся на него как на единственную копию заказов. Основной и
+#    надёжный "журнал" заказов — это сообщения, которые бот шлёт в Telegram
+#    (ADMIN_ID/GROUP_ID): переписка в Telegram никуда не пропадёт при рестарте
+#    контейнера. Если нужна надёжная история в БД — на Northflank можно
+#    подключить Postgres-аддон (есть на бесплатном тарифе) — это отдельная
+#    доработка, скажи, если нужна.
 #
-# 3. Корзины сейчас хранятся в оперативной памяти процесса (словарь cart) —
-#    при перезапуске бота (падение, деплой, "сон" на Render) они обнуляются.
-#    Для реального магазина стоит сохранять корзину в SQLite/Postgres/Redis.
+# 3. Корзины (словарь cart) хранятся в оперативной памяти процесса — при
+#    перезапуске контейнера они обнуляются. Для реального магазина стоит
+#    вынести в тот же Postgres/Redis.
+#
+# 4. Бесплатный тариф Northflank, в отличие от Render, не "усыпляет" сервис —
+#    часы работы постоянные, так что проблема с UptimeRobot из прошлого
+#    вопроса тут не актуальна.
 # ============================================================
